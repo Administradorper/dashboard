@@ -1,0 +1,2659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HYD Capital Humano - ECR Group</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#ffffff;--bg-card:#ffffff;--bg-modal:#ffffff;--fg:#1b2a4a;--fg-muted:#64748b;--accent:#0072bc;--accent-dim:rgba(0,114,188,0.08);--accent-glow:rgba(0,114,188,0.25);--accent2:#f7931e;--accent2-dim:rgba(247,147,30,0.10);--warning:#f7931e;--danger:#ef4444;--success:#10b981;--info:#0072bc;--border:#e2e8f0;--input-bg:#f8fafc;--input-border:#dbe3ee;--card-radius:14px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--fg);min-height:100vh}
+body::before{content:'';position:fixed;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--accent),var(--accent2));z-index:5}
+.screen{position:relative;z-index:2;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:40px;max-width:680px;width:100%;box-shadow:0 20px 60px rgba(27,42,74,0.12)}
+.card.narrow{max-width:420px}
+.card h1{font-size:26px;font-weight:900;margin-bottom:6px}
+.card .sub{color:var(--fg-muted);font-size:14px;margin-bottom:28px;line-height:1.6}
+.ig{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:20px}
+.ig label{font-size:11px;font-weight:700;color:var(--fg-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px}
+.ig input{background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--fg);font-size:13px;font-family:inherit;outline:none;width:100%}
+.ig input:focus{border-color:var(--accent)}
+.btn{padding:14px 24px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.25s;display:flex;align-items:center;justify-content:center;gap:10px;width:100%}
+.btn-go{background:var(--accent);color:#fff}
+.btn-go:hover{background:#0089dd;box-shadow:0 6px 24px var(--accent-glow)}
+.btn-sec{background:var(--input-bg);color:var(--fg);border:1px solid var(--border)}
+.btn-sec:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{width:auto;padding:10px 16px;font-size:13px}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.log{margin-top:20px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px;font-family:'Courier New',monospace;font-size:12px;color:var(--fg-muted);max-height:200px;overflow-y:auto;display:none;line-height:1.8}
+.log.show{display:block}
+.log .err{color:var(--danger)}
+.log .ok{color:var(--success)}
+.log .inf{color:var(--info)}
+.app-container{position:relative;z-index:2;max-width:1440px;margin:0 auto;padding:24px 32px 60px;display:none}
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 32px;border-bottom:1px solid var(--border);margin-bottom:32px;flex-wrap:wrap;gap:16px}
+.header-left{display:flex;align-items:center;gap:16px}
+.logo-icon{height:44px;width:auto;display:flex;align-items:center;justify-content:flex-start}
+.logo-icon svg{height:100%;width:auto;display:block}
+.header-title h1{font-size:22px;font-weight:800}
+.header-title p{font-size:13px;color:var(--fg-muted);margin-top:2px;display:flex;align-items:center;gap:8px}
+.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.sync-dot.online{background:var(--success);box-shadow:0 0 8px rgba(16,185,129,0.5)}
+.sync-dot.offline{background:var(--danger);box-shadow:0 0 8px rgba(239,68,68,0.5);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.4);opacity:0.6}}
+.btn-logout{background:var(--input-bg);border:1px solid var(--input-border);border-radius:10px;padding:10px 14px;color:var(--fg-muted);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:inherit}
+.btn-logout:hover{border-color:var(--danger);color:var(--danger)}
+
+.layout{display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:start}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--card-radius);padding:22px;box-shadow:0 2px 10px rgba(27,42,74,0.05)}
+.panel + .panel{margin-top:20px}
+.panel h2{font-size:15px;font-weight:800;margin-bottom:4px}
+.hint{font-size:12.5px;color:var(--fg-muted);margin-bottom:16px;line-height:1.5}
+
+.client-list{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto}
+.client-item{padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13.5px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid transparent}
+.client-item:hover{background:var(--input-bg)}
+.client-item.active{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)}
+.client-item .n{font-size:11px;font-weight:600;color:var(--fg-muted);background:var(--input-bg);border-radius:6px;padding:2px 7px}
+.client-item.active .n{background:#fff;color:var(--accent)}
+.new-client{display:flex;gap:8px;margin-top:12px}
+.new-client input{flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;font-family:inherit;outline:none}
+.new-client input:focus{border-color:var(--accent)}
+
+.upload-zone{border:2px dashed var(--input-border);border-radius:12px;padding:28px 18px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--input-bg)}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-dim)}
+.upload-zone i{font-size:26px;color:var(--accent);margin-bottom:10px;display:block}
+.upload-zone .t1{font-size:14px;font-weight:700;margin-bottom:4px}
+.upload-zone .t2{font-size:12px;color:var(--fg-muted)}
+.file-row{background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:12px}
+.file-row .fname{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.file-row .fmeta{font-size:12px;color:var(--fg-muted);margin-bottom:10px}
+.file-row .frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.file-row label{font-size:10.5px;font-weight:700;color:var(--fg-muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:4px}
+.file-row input{width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none}
+.file-row input:focus{border-color:var(--accent)}
+.file-row.err{border-color:var(--danger);background:rgba(239,68,68,0.05)}
+.file-row .errmsg{color:var(--danger);font-size:12px;margin-top:8px;font-weight:600}
+.file-row .okmsg{color:var(--success);font-size:12px;margin-top:8px;font-weight:600}
+.imm-hint{font-size:11.5px;color:var(--fg-muted);margin-top:6px;line-height:1.5;background:var(--accent2-dim);border-radius:8px;padding:8px 10px}
+
+.month-list{display:flex;flex-direction:column;gap:6px;margin:14px 0}
+.month-chip{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:var(--input-bg)}
+.month-chip input{width:16px;height:16px;accent-color:var(--accent)}
+.month-chip .m{font-weight:700;flex:1}
+.month-chip .d{color:var(--fg-muted);font-size:12px}
+
+.dash-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.dashboard-preview{border:1px solid var(--border);border-radius:12px;overflow:auto;background:#e9e9e4;max-height:80vh}
+.dashboard-preview iframe{width:100%;min-height:1400px;border:0;display:block}
+.empty-state{text-align:center;padding:60px 20px;color:var(--fg-muted);font-size:13.5px}
+.empty-state i{font-size:32px;margin-bottom:12px;display:block;opacity:0.5}
+
+.tab-bar{display:flex;gap:6px;margin-bottom:14px}
+.tab-btn{background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;color:var(--fg-muted);cursor:pointer;font-family:inherit}
+.tab-btn.active{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)}
+.tab-btn:hover:not(.active){background:#fff}
+
+.alert-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:10px;background:var(--input-bg);display:flex;gap:12px;align-items:flex-start}
+.alert-card .a-ic{font-size:16px;flex-shrink:0;margin-top:2px}
+.alert-card.t-desaparecio{border-left:4px solid var(--danger)}
+.alert-card.t-desaparecio .a-ic{color:var(--danger)}
+.alert-card.t-aparecio{border-left:4px solid var(--accent)}
+.alert-card.t-aparecio .a-ic{color:var(--accent)}
+.alert-card.t-monto{border-left:4px solid #eda100}
+.alert-card.t-monto .a-ic{color:#eda100}
+.alert-card.t-cantidad{border-left:4px solid #4a3aa7}
+.alert-card.t-cantidad .a-ic{color:#4a3aa7}
+.alert-card .a-body{flex:1;min-width:0}
+.alert-card .a-title{font-weight:700;font-size:13px;margin-bottom:3px}
+.alert-card .a-desc{font-size:12px;color:var(--fg-muted);line-height:1.5}
+.alert-month-group{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-muted);margin-top:18px;margin-bottom:2px}
+.alert-month-group:first-child{margin-top:4px}
+
+.bulk-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--accent-dim);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-top:14px}
+.bulk-bar .hint{margin:0;padding:0;background:none;border:0}
+
+.ia-panel{border-top:1px solid var(--border);margin-top:18px;padding-top:16px}
+.ia-panel .ig{margin-bottom:10px}
+.ia-loading{font-size:12.5px;color:var(--fg-muted);margin-top:12px;display:flex;align-items:center;gap:8px}
+.ia-disclaimer{font-size:11.5px;color:var(--fg-muted);line-height:1.5;background:var(--accent2-dim);border-radius:8px;padding:8px 10px;margin-top:12px;display:flex;align-items:flex-start;gap:8px}
+.ia-text{font-size:13px;line-height:1.7;margin-top:10px;color:var(--fg)}
+.ia-text p{margin-bottom:10px}
+.ia-text p:last-child{margin-bottom:0}
+
+.dj-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;max-height:420px;overflow-y:auto}
+.dj-table{border-collapse:collapse;width:100%;font-size:11.5px;white-space:nowrap}
+.dj-table th{position:sticky;top:0;background:var(--input-bg);color:var(--fg-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.3px;font-size:10px;text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);z-index:1}
+.dj-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--fg)}
+.dj-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.dj-table tr:last-child td{border-bottom:none}
+.dj-table td.pend{color:var(--fg-muted);font-style:italic}
+.dj-table tr.dj-total td{font-weight:800;background:var(--input-bg);border-top:2px solid var(--border)}
+.dj-company-block{margin-top:18px}
+.dj-company-block:first-child{margin-top:0}
+.dj-company-banner{background:var(--accent-dim);color:var(--accent);font-weight:800;font-size:12.5px;padding:9px 14px;border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none}
+.dj-rut-pend{font-weight:400;color:var(--fg-muted);font-size:11px}
+.dj-company-block .dj-table-wrap{border-radius:0 0 10px 10px}
+
+.toast-c{position:fixed;bottom:24px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:10px}
+.toast{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:12px;font-size:13px;font-weight:500;box-shadow:0 10px 30px rgba(27,42,74,0.15);animation:ti 0.4s cubic-bezier(0.16,1,0.3,1);min-width:280px}
+.toast.out{animation:to 0.3s ease forwards}
+@keyframes ti{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes to{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}
+.t-ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.t-ic.success{background:rgba(16,185,129,0.15);color:#10b981}
+.t-ic.info{background:rgba(59,130,246,0.15);color:#3b82f6}
+.t-ic.warn{background:rgba(245,158,11,0.15);color:#f59e0b}
+</style>
+</head>
+<body>
+
+<div class="screen" id="setupScreen">
+<div class="card">
+    <div class="logo-icon" style="height:52px;margin-bottom:18px"><svg viewBox="0 0 300 76" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ECR Group"><rect x="0" y="4" width="26" height="26" rx="6" fill="#0072BC"/><rect x="32" y="4" width="26" height="26" rx="6" fill="#F7931E"/><rect x="0" y="36" width="26" height="26" rx="6" fill="#0072BC"/><rect x="32" y="36" width="26" height="26" rx="6" fill="#0072BC"/><text x="70" y="32" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="28" fill="#1B2A4A">ECR<tspan fill="#0072BC">GROUP</tspan></text><rect x="71" y="40" width="190" height="3" fill="#F7931E"/><text x="71" y="60" font-family="Arial,Helvetica,sans-serif" font-weight="600" font-style="italic" font-size="13" fill="#0072BC">Para que te dediques a tu negocio</text></svg></div>
+    <h1>Configurar Firebase</h1>
+    <p class="sub">Este panel usa su propio proyecto de Firebase (distinto al de Fichas Clientes). Pega aquí los datos de ese proyecto — este paso solo lo hace un administrador una vez, en este navegador. Los datos se guardan en este computador; si abres el panel desde otro computador, hay que configurarlo ahí también.</p>
+    <div class="ig">
+        <label>apiKey</label><input id="c1" placeholder="AIzaSy...">
+        <label>authDomain</label><input id="c2" placeholder="proyecto.firebaseapp.com">
+        <label>projectId</label><input id="c3" placeholder="proyecto-id">
+        <label>storageBucket</label><input id="c4" placeholder="proyecto.appspot.com">
+        <label>messagingSenderId</label><input id="c5" placeholder="123456789">
+        <label>appId</label><input id="c6" placeholder="1:123:web:abc...">
+        <label>ID de la base de datos de Firestore</label><input id="c7" placeholder="(default) o el nombre que le hayas puesto, ej: hyd">
+    </div>
+    <div class="hint" style="margin-bottom:16px;">Si al crear la base de Firestore te obligó a ponerle un nombre (porque "(default)" pedía plan de pago), escribe exactamente ese nombre en el último campo. Si no, deja "(default)".</div>
+    <button class="btn btn-go" id="btnGo"><i class="fas fa-plug"></i> Conectar a Firebase</button>
+    <button class="btn btn-sec" id="btnClr" style="margin-top:10px">Limpiar datos guardados</button>
+    <div class="log" id="log"></div>
+</div>
+</div>
+
+<div class="screen" id="loginScreen" style="display:none">
+<div class="card narrow">
+    <div class="logo-icon" style="height:52px;margin-bottom:18px"><svg viewBox="0 0 300 76" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ECR Group"><rect x="0" y="4" width="26" height="26" rx="6" fill="#0072BC"/><rect x="32" y="4" width="26" height="26" rx="6" fill="#F7931E"/><rect x="0" y="36" width="26" height="26" rx="6" fill="#0072BC"/><rect x="32" y="36" width="26" height="26" rx="6" fill="#0072BC"/><text x="70" y="32" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="28" fill="#1B2A4A">ECR<tspan fill="#0072BC">GROUP</tspan></text><rect x="71" y="40" width="190" height="3" fill="#F7931E"/><text x="71" y="60" font-family="Arial,Helvetica,sans-serif" font-weight="600" font-style="italic" font-size="13" fill="#0072BC">Para que te dediques a tu negocio</text></svg></div>
+    <h1>HYD Capital Humano</h1>
+    <p class="sub">Ingresa con la cuenta del equipo que se haya creado en este proyecto de Firebase.</p>
+    <div class="ig">
+        <label>Correo</label><input id="loginEmail" type="email" placeholder="usuario@empresa.cl">
+        <label>Contraseña</label><input id="loginPass" type="password" placeholder="••••••••••••">
+    </div>
+    <button class="btn btn-go" id="btnLogin"><i class="fas fa-right-to-bracket"></i> Ingresar</button>
+    <div class="log" id="loginLog"></div>
+</div>
+</div>
+
+<div class="app-container" id="app">
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-icon"><svg viewBox="0 0 300 76" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ECR Group"><rect x="0" y="4" width="26" height="26" rx="6" fill="#0072BC"/><rect x="32" y="4" width="26" height="26" rx="6" fill="#F7931E"/><rect x="0" y="36" width="26" height="26" rx="6" fill="#0072BC"/><rect x="32" y="36" width="26" height="26" rx="6" fill="#0072BC"/><text x="70" y="32" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="28" fill="#1B2A4A">ECR<tspan fill="#0072BC">GROUP</tspan></text><rect x="71" y="40" width="190" height="3" fill="#F7931E"/><text x="71" y="60" font-family="Arial,Helvetica,sans-serif" font-weight="600" font-style="italic" font-size="13" fill="#0072BC">Para que te dediques a tu negocio</text></svg></div>
+            <div class="header-title"><h1>HYD Capital Humano</h1><p><span class="sync-dot online" id="syncDot"></span> <span id="syncText">Conectado en tiempo real</span></p></div>
+        </div>
+        <div class="header-right">
+            <button class="btn-logout" id="btnLogout"><i class="fas fa-right-from-bracket"></i> Salir</button>
+        </div>
+    </header>
+
+    <div class="layout">
+      <!-- LEFT: client picker -->
+      <div>
+        <div class="panel">
+          <h2>Clientes</h2>
+          <div class="hint">Selecciona un cliente para subir su HYD mensual o ver su dashboard. Si es la primera vez, escribe el nombre abajo — se crea solo al subir el primer archivo.</div>
+          <div class="client-list" id="clientList"></div>
+          <div class="new-client">
+            <input id="newClientName" placeholder="Nombre de un cliente nuevo...">
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: upload + dashboard, or revisión de procesos -->
+      <div>
+        <div class="tab-bar">
+          <button type="button" class="tab-btn active" id="tabBtnDashboard"><i class="fas fa-chart-line"></i> Dashboard</button>
+          <button type="button" class="tab-btn" id="tabBtnAuditoria"><i class="fas fa-magnifying-glass-chart"></i> Revisión de procesos</button>
+          <button type="button" class="tab-btn" id="tabBtnDj1887"><i class="fas fa-file-invoice-dollar"></i> DJ 1887</button>
+        </div>
+
+        <div id="viewDashboard">
+          <div class="panel" id="uploadPanel">
+            <h2>Subir HYD</h2>
+            <div class="hint">Sube uno o varios archivos HYD (.xlsx). El cliente y el mes se detectan solos desde cada archivo, así que puedes seleccionar de una vez el HYD de <b>varios clientes y varios meses juntos</b> — se procesan aquí mismo en el navegador (nunca se sube el detalle por colaborador, solo los indicadores agregados) y quedan agrupados en una tarjeta por cliente + mes, con un botón para guardarlas todas de un solo clic.</div>
+            <div class="upload-zone" id="dropZone">
+              <i class="fas fa-cloud-arrow-up"></i>
+              <div class="t1">Arrastra archivos aquí o haz clic para elegir</div>
+              <div class="t2">.xlsx — puedes seleccionar varios meses a la vez</div>
+            </div>
+            <input type="file" id="fileInput" accept=".xlsx" multiple style="display:none">
+            <div id="fileRows"></div>
+          </div>
+
+          <div class="panel">
+            <h2>Dashboard</h2>
+            <div class="hint" id="monthsHint">Elige un cliente para ver sus meses disponibles.</div>
+            <div class="month-list" id="monthList"></div>
+            <div class="dash-toolbar">
+              <button class="btn btn-go btn-sm" id="btnGenerar" disabled><i class="fas fa-chart-line"></i> Generar dashboard</button>
+              <button class="btn btn-sec btn-sm" id="btnDescargarPdf" disabled><i class="fas fa-file-pdf"></i> Descargar PDF</button>
+            </div>
+            <div class="dashboard-preview" id="dashPreviewWrap">
+              <div class="empty-state"><i class="fas fa-chart-simple"></i>Selecciona los meses y presiona "Generar dashboard".</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="viewAuditoria" style="display:none">
+          <div class="panel" id="auditoriaUploadPanel">
+            <h2>Subir resumen de auditoría de <span id="auditoriaClienteName">-</span></h2>
+            <div class="hint" id="auditoriaUploadHint">Selecciona un cliente a la izquierda primero (o crea uno nuevo escribiendo su nombre) — a diferencia del HYD, el "Resumen de Procesos para auditoría" de BUK no trae el nombre del cliente adentro del archivo, así que hay que indicarlo aparte.</div>
+            <div class="upload-zone" id="auditoriaDropZone" style="display:none">
+              <i class="fas fa-file-invoice"></i>
+              <div class="t1">Arrastra archivos aquí o haz clic para elegir</div>
+              <div class="t2">.xls / .xlsx — puedes seleccionar varios meses a la vez, el mes se detecta del nombre del archivo</div>
+            </div>
+            <input type="file" id="auditoriaFileInput" accept=".xls,.xlsx" multiple style="display:none">
+            <div id="auditoriaFileRows"></div>
+          </div>
+
+          <div class="panel">
+            <h2>Alertas de revisión de procesos</h2>
+            <div class="hint" id="auditoriaAlertsHint">Elige un cliente a la izquierda para ver sus alertas mes a mes.</div>
+            <div id="auditoriaAlertsList"></div>
+            <button class="btn btn-sec btn-sm" id="btnDescargarAlertasExcel" disabled style="margin-top:12px;width:auto;"><i class="fas fa-file-excel"></i> Descargar tabla de alertas (Excel)</button>
+
+            <div class="ia-panel">
+              <h2 style="font-size:15px;margin-bottom:8px;">Análisis con IA</h2>
+              <div class="hint">Un experto en remuneraciones (IA) revisa las alertas de arriba y te explica cuáles conviene mirar primero y por qué — sin dar una determinación legal definitiva, eso siempre lo confirma tu equipo legal/laboral o los criterios vigentes de la Dirección del Trabajo.</div>
+              <div class="ig" style="grid-template-columns:2fr 1fr;">
+                <div>
+                  <label>Clave de API de Anthropic (Claude)</label>
+                  <input type="password" id="anthropicApiKey" placeholder="sk-ant-...">
+                </div>
+                <div>
+                  <label>Modelo</label>
+                  <input type="text" id="anthropicModel" placeholder="claude-sonnet-4-5-20250929">
+                </div>
+              </div>
+              <div class="hint" style="margin-bottom:12px;">Tu clave se guarda solo en este navegador (nunca queda escrita en el archivo del panel) y cada análisis tiene un costo pequeño en tu cuenta de Anthropic. Consíguela en <b>console.anthropic.com</b>.</div>
+              <button class="btn btn-go btn-sm" id="btnAnalizarIA" disabled><i class="fas fa-wand-magic-sparkles"></i> Analizar con IA</button>
+              <div id="auditoriaIaResult"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="viewDj1887" style="display:none">
+          <div class="panel" id="dj1887UploadPanel">
+            <h2>Subir HYD para DJ 1887</h2>
+            <div class="hint">Sube uno o varios archivos HYD (.xlsx) — los mismos que usas para el Dashboard — de todos los meses del año que quieras incluir en el resumen para la <b>Declaración Jurada N°1887</b>. El cliente y el mes se detectan solos desde cada archivo, así que puedes subir varios clientes y varios meses juntos. Todo se procesa aquí mismo en el navegador; <b>no se incluye nombre ni RUT del colaborador</b> en ningún resultado (el HYD tampoco los trae) — el cruce con la identidad real de cada persona lo haces tú después con tus propios registros.</div>
+            <div class="upload-zone" id="dj1887DropZone">
+              <i class="fas fa-cloud-arrow-up"></i>
+              <div class="t1">Arrastra archivos aquí o haz clic para elegir</div>
+              <div class="t2">.xlsx — puedes seleccionar varios meses (y clientes) a la vez</div>
+            </div>
+            <input type="file" id="dj1887FileInput" accept=".xlsx" multiple style="display:none">
+            <div id="dj1887FileRows"></div>
+            <button class="btn btn-go btn-sm" id="btnGenerarDj1887" disabled style="margin-top:14px;"><i class="fas fa-calculator"></i> Generar resumen DJ 1887</button>
+          </div>
+
+          <div class="panel" id="dj1887ResultPanel" style="display:none">
+            <h2>Resumen DDJJ 1887</h2>
+            <div class="ia-disclaimer"><i class="fas fa-circle-info"></i> <span>Este resumen es un <b>apoyo para armar la DJ 1887</b>, no el archivo final para importar en el SII. No es por colaborador — son los montos totales de la empresa mes a mes, igual al resumen que entrega BUK. El RUT de la empresa, Renta Total Exenta, Rebaja Zonas Extremas, Impuesto Único retenido entre Ene-Abr del año siguiente y el 3% Préstamo Tasa 0% no se pueden calcular desde el HYD — quedan marcados para que tú (o tu equipo contable) los completes, y conviene validar el resultado con tu asesor tributario antes de declarar.</span></div>
+            <button class="btn btn-sec btn-sm" id="btnDescargarDj1887Excel" style="margin-top:12px;width:auto;"><i class="fas fa-file-excel"></i> Descargar DJ 1887 (Excel)</button>
+
+            <div id="dj1887ResultWrap" style="margin-top:18px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>
+
+<div class="toast-c" id="toasts"></div>
+
+<script type="module">
+// ============================================================================
+// Firebase — proyecto PROPIO de este panel ("dashboard-clientes-ecr"),
+// distinto al de "Fichas Clientes". Los datos de conexión quedan escritos acá
+// abajo (HARDCODED_FIREBASE_CONFIG), así que cualquiera que abra este archivo
+// va directo a la pantalla de acceso y solo necesita su correo y contraseña
+// — no vuelve a pedir los 6 datos de Firebase. Colección: "hyd_meses".
+// ============================================================================
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { initializeFirestore, collection, doc, setDoc, getDocs, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const COLLECTION = "hyd_meses";
+
+const HARDCODED_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC6-viZ34OjQqhyPoKYqMhCysYUQ3Aiank",
+  authDomain: "dashboard-clientes-ecr.firebaseapp.com",
+  projectId: "dashboard-clientes-ecr",
+  storageBucket: "dashboard-clientes-ecr.firebasestorage.app",
+  messagingSenderId: "139614298364",
+  appId: "1:139614298364:web:49ea1ce75a600d390e3779",
+};
+const HARDCODED_DATABASE_ID = "(default)";
+
+let db = null, auth = null, unsub = null, pollT = null;
+let meses = []; // all month-aggregate docs from Firestore, across all clients
+let curClienteSlug = null;
+let curClienteNombre = null;
+let pendingFiles = []; // [{file, rows, mes, mesLabel, cliente, imm, tramoUmbral, error}]
+let user = localStorage.getItem("hyd_user") || "";
+let pendingDj1887Files = []; // [{file, rows, headerRow, cliente, clienteSlug, mes, mesLabel, dotacionPreview, error}]
+let dj1887EmployeeRows = []; // flat rows produced by "Generar resumen DJ 1887", one per colaborador+mes
+
+function initFirebase(cfg, dbId) {
+  const app = getApps().length ? getApps()[0] : initializeApp(cfg);
+  const useDb = dbId && dbId.trim() ? dbId.trim() : "(default)";
+  db = useDb === "(default)" ? initializeFirestore(app, { experimentalForceLongPolling: true, useFetchStreams: false })
+                              : initializeFirestore(app, { experimentalForceLongPolling: true, useFetchStreams: false }, useDb);
+  auth = getAuth(app);
+}
+
+function log(m, t) {
+  const l = document.getElementById("log");
+  l.classList.add("show");
+  l.innerHTML += `<div class="${t||''}">${esc(m)}</div>`;
+  l.scrollTop = l.scrollHeight;
+}
+
+async function go() {
+  const logEl = document.getElementById("log"); logEl.innerHTML = ""; logEl.classList.add("show");
+  const cfg = {
+    apiKey: document.getElementById("c1").value.trim(),
+    authDomain: document.getElementById("c2").value.trim(),
+    projectId: document.getElementById("c3").value.trim(),
+    storageBucket: document.getElementById("c4").value.trim(),
+    messagingSenderId: document.getElementById("c5").value.trim(),
+    appId: document.getElementById("c6").value.trim(),
+  };
+  const dbId = document.getElementById("c7").value.trim() || "(default)";
+  if (!cfg.apiKey || !cfg.projectId || !cfg.appId) { log("ERROR: Falta apiKey, projectId o appId", "err"); return; }
+  localStorage.setItem("hyd_fb", JSON.stringify(cfg));
+  localStorage.setItem("hyd_fb_dbid", dbId);
+  log("Iniciando Firebase...", "inf");
+  try {
+    initFirebase(cfg, dbId);
+    log("Conectado. Mostrando pantalla de acceso...", "ok");
+    showLogin();
+  } catch (e) {
+    log("ERROR: " + e.message, "err");
+  }
+}
+
+function showLogin() {
+  document.getElementById("setupScreen").style.display = "none";
+  document.getElementById("loginScreen").style.display = "flex";
+}
+
+function toast(m, t) {
+  t = t || "success";
+  const c = document.getElementById("toasts");
+  const e = document.createElement("div");
+  e.className = "toast";
+  e.innerHTML = `<div class="t-ic ${t}"><i class="fas fa-${t==='success'?'check':t==='warn'?'exclamation-triangle':'info-circle'}"></i></div><span>${esc(m)}</span>`;
+  c.appendChild(e);
+  setTimeout(() => { e.classList.add("out"); setTimeout(() => e.remove(), 300); }, 4000);
+}
+
+function loginLog(m, t) {
+  const l = document.getElementById("loginLog");
+  l.classList.add("show");
+  l.innerHTML += `<div class="${t||''}">${esc(m)}</div>`;
+  l.scrollTop = l.scrollHeight;
+}
+
+function setSyncState(online) {
+  const dot = document.getElementById("syncDot"), txt = document.getElementById("syncText");
+  if (!dot || !txt) return;
+  if (online) { dot.classList.remove("offline"); dot.classList.add("online"); txt.textContent = "Conectado en tiempo real"; }
+  else { dot.classList.remove("online"); dot.classList.add("offline"); txt.textContent = "Sin conexión en tiempo real (revisa tu internet)"; }
+}
+
+async function doLogin() {
+  const ll = document.getElementById("loginLog"); ll.innerHTML = ""; ll.classList.add("show");
+  const email = document.getElementById("loginEmail").value.trim();
+  const pass = document.getElementById("loginPass").value;
+  if (!email || !pass) { loginLog("Ingresa el correo y la contraseña del equipo.", "err"); return; }
+  loginLog("Verificando acceso...", "inf");
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    loginLog("Acceso correcto. Cargando datos...", "ok");
+    if (!user) { user = await askName(); localStorage.setItem("hyd_user", user); }
+    await loadData();
+    startApp();
+  } catch (e) {
+    loginLog("ERROR: " + e.message, "err");
+    loginLog('Si dice "user-not-found" o "wrong-password", pide la cuenta correcta al administrador.', "err");
+  }
+}
+
+function askName() {
+  return new Promise((r) => {
+    const o = document.createElement("div");
+    o.style.cssText = "position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:20px;";
+    o.innerHTML = `<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;padding:40px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(27,42,74,0.25);"><h2 style="font-size:20px;font-weight:800;margin-bottom:6px;color:#1b2a4a;">Bienvenido</h2><p style="font-size:13px;color:#64748b;margin-bottom:24px;">Ingresa tu nombre:</p><input type="text" id="nI" placeholder="Ej: Marcela Valencia" style="width:100%;padding:12px 16px;background:#f8fafc;border:1px solid #dbe3ee;border-radius:10px;color:#1b2a4a;font-size:15px;font-family:Inter,sans-serif;outline:none;margin-bottom:16px;"><button id="nB" style="width:100%;padding:14px;background:#0072bc;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Ingresar</button></div>`;
+    document.body.appendChild(o);
+    const i = o.querySelector("#nI"), b = o.querySelector("#nB");
+    function ok() { o.remove(); r(i.value.trim() || "Usuario"); }
+    b.addEventListener("click", ok);
+    i.addEventListener("keydown", (e) => { if (e.key === "Enter") ok(); });
+    setTimeout(() => i.focus(), 100);
+  });
+}
+
+function startApp() {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  listen();
+  startPolling();
+  listenAuditoria();
+  startPollingAuditoria();
+  renderClientList();
+  toast("Bienvenido, " + user + ".");
+}
+
+async function loadData() {
+  const snap = await getDocs(collection(db, COLLECTION));
+  meses = [];
+  snap.forEach((d) => meses.push(d.data()));
+  const auditSnap = await getDocs(collection(db, AUDIT_COLLECTION));
+  auditorias = [];
+  auditSnap.forEach((d) => auditorias.push(d.data()));
+}
+
+function listen() {
+  if (unsub) unsub();
+  unsub = onSnapshot(collection(db, COLLECTION),
+    (snap) => {
+      // No usamos snap.metadata.fromCache (bug conocido del SDK, firebase-js-sdk#3053) —
+      // si estamos recibiendo snapshots, hay conexión.
+      setSyncState(true);
+      snap.docChanges().forEach((ch) => {
+        const data = ch.doc.data();
+        if (ch.type === "removed") {
+          // El id del doc es "<clienteSlug>__<mes>" — no dependemos de data()
+          // acá porque algunos entornos no garantizan el contenido de un doc
+          // ya eliminado.
+          const sep = ch.doc.id.lastIndexOf("__");
+          const slug = sep !== -1 ? ch.doc.id.slice(0, sep) : (data && data.clienteSlug);
+          const mesVal = sep !== -1 ? ch.doc.id.slice(sep + 2) : (data && data.mes);
+          const idx = meses.findIndex((m) => m.clienteSlug === slug && m.mes === mesVal);
+          if (idx !== -1) meses.splice(idx, 1);
+          return;
+        }
+        if (!data) return;
+        const idx = meses.findIndex((m) => m.clienteSlug === data.clienteSlug && m.mes === data.mes);
+        if (idx !== -1) meses[idx] = data;
+        else meses.push(data);
+      });
+      renderClientList();
+      if (curClienteSlug) renderMonthList();
+    },
+    (err) => {
+      console.error("Error en la conexión en tiempo real:", err);
+      setSyncState(false);
+      toast("Se perdió la conexión en tiempo real: " + err.message, "warn");
+    }
+  );
+}
+
+// Respaldo para redes de oficina que cortan la conexión en tiempo real.
+function startPolling() {
+  if (pollT) clearInterval(pollT);
+  pollT = setInterval(async () => {
+    try {
+      const snap = await getDocs(collection(db, COLLECTION));
+      const fresh = [];
+      snap.forEach((d) => fresh.push(d.data()));
+      meses = fresh;
+      renderClientList();
+      if (curClienteSlug) renderMonthList();
+      setSyncState(true);
+    } catch (e) {
+      console.error("Error en la actualización periódica:", e);
+    }
+  }, 15000);
+}
+
+async function saveMonthDoc(agg) {
+  const id = agg.clienteSlug + "__" + agg.mes;
+  await setDoc(doc(db, COLLECTION, id), agg);
+}
+
+// Para corregir un mes mal guardado (p.ej. quedó con datos incorrectos por un
+// error ya corregido en el panel): se borra el documento y se puede volver a
+// subir el archivo para regenerarlo bien. También sirve para eliminar
+// clientes de prueba o duplicados (borrando todos sus meses, uno por uno).
+async function deleteMonthDoc(clienteSlug, mes) {
+  const id = clienteSlug + "__" + mes;
+  await deleteDoc(doc(db, COLLECTION, id));
+  const idx = meses.findIndex((m) => m.clienteSlug === clienteSlug && m.mes === mes);
+  if (idx !== -1) meses.splice(idx, 1);
+}
+
+// ============================================================================
+// UI: client list
+// ============================================================================
+
+function clientsFromMeses() {
+  const byClient = {};
+  meses.forEach((m) => {
+    if (!byClient[m.clienteSlug]) byClient[m.clienteSlug] = { nombre: m.cliente, slug: m.clienteSlug, n: 0 };
+    byClient[m.clienteSlug].n++;
+  });
+  // Un cliente puede tener solo resúmenes de auditoría (sin HYD todavía) — igual
+  // debe aparecer en la lista de la izquierda para poder seleccionarlo.
+  auditorias.forEach((a) => {
+    if (!byClient[a.clienteSlug]) byClient[a.clienteSlug] = { nombre: a.cliente, slug: a.clienteSlug, n: 0 };
+  });
+  return Object.values(byClient).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+function renderClientList() {
+  const el = document.getElementById("clientList");
+  const clients = clientsFromMeses();
+  if (!clients.length) {
+    el.innerHTML = '<div style="font-size:12.5px;color:var(--fg-muted);padding:8px 4px;">Todavía no hay ningún cliente cargado.</div>';
+  } else {
+    el.innerHTML = clients.map((c) =>
+      `<div class="client-item ${c.slug === curClienteSlug ? "active" : ""}" data-slug="${esc(c.slug)}" data-nombre="${esc(c.nombre)}">
+        <span>${esc(c.nombre)}</span><span class="n">${c.n} ${c.n === 1 ? "mes" : "meses"}</span>
+      </div>`
+    ).join("");
+    el.querySelectorAll(".client-item").forEach((it) => {
+      it.addEventListener("click", () => selectClient(it.dataset.slug, it.dataset.nombre));
+    });
+  }
+}
+
+function selectClient(slug, nombre) {
+  curClienteSlug = slug;
+  curClienteNombre = nombre;
+  renderClientList();
+  renderMonthList();
+  clearDashboard();
+  refreshAuditoriaClientUI();
+}
+
+// ============================================================================
+// UI: upload flow
+// ============================================================================
+
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+dropZone.addEventListener("click", () => fileInput.click());
+dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("drag"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag"));
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault(); dropZone.classList.remove("drag");
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener("change", (e) => { handleFiles(e.target.files); fileInput.value = ""; });
+
+async function handleFiles(fileList) {
+  for (const file of Array.from(fileList)) {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      // Se lee la planilla como matriz cruda (fila de encabezados + filas de
+      // datos) y las filas se arman a mano usando el encabezado YA recortado
+      // (trim) como llave de cada campo. Esto evita el problema de que
+      // sheet_to_json use el texto crudo del encabezado (que puede traer
+      // espacios extra u otros caracteres invisibles) como llave del objeto:
+      // antes, el chequeo de columnas esenciales comparaba contra el
+      // encabezado recortado y pasaba, pero la lectura de cada dato seguía
+      // usando la llave cruda y no encontraba nada (todo salía en blanco/0).
+      // Ahora encabezado y datos usan siempre la misma llave recortada.
+      const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+      const headerRow = (aoa[0] || []).map((h) => (h == null ? "" : String(h).trim()));
+      const rows = aoa.slice(1).map((r) => {
+        const obj = {};
+        headerRow.forEach((h, idx) => {
+          if (!h) return;
+          const v = r[idx];
+          obj[h] = v === undefined ? null : v;
+        });
+        return obj;
+      });
+      // Un archivo de "bono reliquidado" es un export distinto (Reliquidaciones -
+      // mes/Monto/Impuesto/...) que no trae dotación ni columnas de rol — se
+      // detecta y se trata aparte: aporta plata al mes (haberes, impuesto,
+      // aportes patronales) pero no colaboradores nuevos.
+      const isBono = headerRow.includes("Reliquidaciones - Monto");
+      const entry = { file, rows, headerRow, error: null, kind: isBono ? "bono" : "roster" };
+      try {
+        const preview = isBono ? peekPeriodBono(rows, headerRow) : peekPeriod(rows, headerRow);
+        entry.cliente = preview.cliente;
+        entry.clienteSlug = slugify(preview.cliente);
+        entry.mes = preview.mes;
+        entry.mesLabel = preview.mesLabel;
+        entry.dotacionPreview = preview.n;
+        if (isBono) entry.montoPreview = preview.montoTotal;
+      } catch (e) {
+        entry.error = e.message;
+        entry.detectedHeaders = e.detected || null;
+      }
+      const lastImm = localStorage.getItem("hyd_imm_" + (entry.mes || "")) || "";
+      entry.imm = lastImm;
+      entry.tramoUmbral = localStorage.getItem("hyd_tramo_umbral") || "1200000";
+      pendingFiles.push(entry);
+    } catch (e) {
+      toast("No se pudo leer " + file.name + ": " + e.message, "warn");
+    }
+  }
+  renderFileRows();
+}
+
+function peekPeriod(rows, headerRow) {
+  const missing = HYD_ESSENTIAL.filter((c) => !headerRow.includes(c));
+  if (missing.length) {
+    const detected = headerRow.filter(Boolean);
+    const e = new Error("Faltan columnas esenciales: " + missing.join(", "));
+    e.detected = detected;
+    throw e;
+  }
+  const clean = rows.filter((r) => r["Liquidación - Período"] != null && r["Liquidación - Período"] !== "");
+  if (!clean.length) throw new Error("No se encontró ningún período válido en este archivo.");
+  const empresas = Array.from(new Set(clean.map((r) => r["Empresa - Nombre Empresa"]).filter(Boolean)));
+  const periodos = clean.map((r) => toDate(r["Liquidación - Período"])).filter(Boolean);
+  const mesKeys = Array.from(new Set(periodos.map(ymKey)));
+  if (mesKeys.length > 1) throw new Error("Este archivo trae más de un período (" + mesKeys.join(", ") + "). Sube un archivo por mes.");
+  const mm = mesKeys[0].split("-")[1];
+  return { cliente: empresas[0] || "Cliente", mes: mesKeys[0], mesLabel: MESES_ES[mm], n: clean.length };
+}
+
+// Export "Reliquidaciones" (p.ej. bono anual reliquidado): trae Reliquidaciones -
+// mes/Monto/Impuesto/Salud/AFP/Cesantía/Líquido/Cesantía Empleador/Mutual/SIS/
+// Dif. Afp Prevision Empleador/Dif. Cotización Expectativa de Vida/dif_aportes_empleador,
+// pero no las columnas de rol (Tipo de Contrato, Centro de Costo, etc.) — cada fila
+// es un colaborador que recibió una reliquidación ese mes, no un colaborador nuevo.
+function peekPeriodBono(rows, headerRow) {
+  const required = ["Empresa - Nombre Empresa", "Reliquidaciones - mes", "Reliquidaciones - Monto"];
+  const missing = required.filter((c) => !headerRow.includes(c));
+  if (missing.length) {
+    const detected = headerRow.filter(Boolean);
+    const e = new Error("Faltan columnas esenciales de reliquidación: " + missing.join(", "));
+    e.detected = detected;
+    throw e;
+  }
+  const clean = rows.filter((r) => r["Reliquidaciones - mes"] != null && r["Reliquidaciones - mes"] !== "");
+  if (!clean.length) throw new Error("No se encontró ningún período válido en este archivo de reliquidación.");
+  const empresas = Array.from(new Set(clean.map((r) => r["Empresa - Nombre Empresa"]).filter(Boolean)));
+  const periodos = clean.map((r) => toDate(r["Reliquidaciones - mes"])).filter(Boolean);
+  const mesKeys = Array.from(new Set(periodos.map(ymKey)));
+  if (mesKeys.length > 1) throw new Error("Este archivo de reliquidación trae más de un período (" + mesKeys.join(", ") + "). Sube un archivo por mes.");
+  const mm = mesKeys[0].split("-")[1];
+  const montoTotal = clean.reduce((s, r) => s + num(r["Reliquidaciones - Monto"]), 0);
+  return { cliente: empresas[0] || "Cliente", mes: mesKeys[0], mesLabel: MESES_ES[mm], n: clean.length, montoTotal };
+}
+
+// Los archivos que llegan para un mismo mes (p.ej. rol general + rol privado,
+// y opcionalmente un bono reliquidado) se agrupan en UNA sola tarjeta por mes:
+// se guardan juntos y se suman en un solo registro del dashboard. El cliente
+// de cada tarjeta se detecta solo desde la columna "Empresa - Nombre
+// Empresa" de cada archivo (no depende de qué cliente esté seleccionado a la
+// izquierda), así que se puede seleccionar de una vez el HYD de VARIOS
+// clientes y meses juntos: cada combinación (cliente, mes) arma su propia
+// tarjeta, y "Guardar todo" las guarda todas en un solo clic.
+function renderFileRows() {
+  const wrap = document.getElementById("fileRows");
+  const groups = {}; const order = [];
+  const errorHtml = pendingFiles.filter((e) => e.error).map((entry) => {
+    const detectedHtml = entry.detectedHeaders
+      ? `<details style="margin-top:8px;font-size:11.5px;color:var(--fg-muted);">
+          <summary style="cursor:pointer;">Ver columnas detectadas en el archivo (${entry.detectedHeaders.length})</summary>
+          <div style="margin-top:6px;line-height:1.6;">${entry.detectedHeaders.map(esc).join(", ")}</div>
+        </details>`
+      : "";
+    return `<div class="file-row err">
+      <div class="fname"><i class="fas fa-file-excel"></i> ${esc(entry.file.name)}</div>
+      <div class="errmsg"><i class="fas fa-triangle-exclamation"></i> ${esc(entry.error)}</div>
+      ${detectedHtml}
+    </div>`;
+  }).join("");
+
+  pendingFiles.forEach((entry) => {
+    if (entry.error) return;
+    const groupKey = entry.clienteSlug + "__" + entry.mes;
+    if (!groups[groupKey]) { groups[groupKey] = []; order.push(groupKey); }
+    groups[groupKey].push(entry);
+  });
+  order.sort((a, b) => {
+    const [clienteA, mesA] = [a.slice(0, a.indexOf("__")), a.slice(a.indexOf("__") + 2)];
+    const [clienteB, mesB] = [b.slice(0, b.indexOf("__")), b.slice(b.indexOf("__") + 2)];
+    return clienteA === clienteB ? mesA.localeCompare(mesB) : clienteA.localeCompare(clienteB);
+  });
+
+  const groupsHtml = order.map((groupKey) => {
+    const items = groups[groupKey];
+    const mes = items[0].mes;
+    const rosterItems = items.filter((e) => e.kind !== "bono");
+    const bonoItems = items.filter((e) => e.kind === "bono");
+    const first = items[0];
+    const dotacionTotal = rosterItems.reduce((s, e) => s + e.dotacionPreview, 0);
+    const filesListHtml = items.map((entry) => {
+      const detail = entry.kind === "bono"
+        ? `bono reliquidado &middot; ${entry.dotacionPreview} colaborador(es) &middot; ${fmtClp(entry.montoPreview)}`
+        : `${entry.dotacionPreview} colaboradores`;
+      return `<div class="fname" style="font-size:11.5px;font-weight:400;"><i class="fas fa-file-excel"></i> ${esc(entry.file.name)} <span style="color:var(--fg-muted)">— ${detail}</span></div>`;
+    }).join("");
+    const lastImm = localStorage.getItem("hyd_imm_" + mes) || "";
+    const tramoUmbral = localStorage.getItem("hyd_tramo_umbral") || "1200000";
+    const bonoNote = bonoItems.length
+      ? `<div class="imm-hint">
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;text-transform:none;font-weight:400;letter-spacing:normal;">
+            <input type="checkbox" class="bono-include" data-group="${esc(groupKey)}" style="width:auto;margin-top:2px;">
+            <span><i class="fas fa-circle-info"></i> Este mes trae ${bonoItems.length} archivo(s) de bono reliquidado detectado(s) (${bonoItems.map((e) => esc(e.file.name)).join(", ")}). Por defecto NO se incluyen en los totales (pendiente de confirmar con el equipo de remuneraciones si el bono anual es imponible o no imponible — el resumen de auditoría de BUK lo muestra como no imponible). Marca el casillero solo si quieres sumarlo igual a los haberes, impuesto único y aportes patronales de este mes.</span>
+          </label>
+        </div>`
+      : "";
+    return `<div class="file-row" data-group="${esc(groupKey)}" data-mes="${esc(mes)}">
+      <div class="fmeta" style="font-weight:600;">${esc(first.cliente)} &middot; ${esc(first.mesLabel)} ${mes.slice(0,4)} &middot; ${dotacionTotal} colaboradores combinados (${rosterItems.length} archivo${rosterItems.length===1?"":"s"} de rol)</div>
+      ${filesListHtml}
+      ${bonoNote}
+      <div class="frow">
+        <div>
+          <label>IMM vigente ese mes (CLP)</label>
+          <input type="number" class="imm-input" data-group="${esc(groupKey)}" value="${esc(lastImm)}" placeholder="Ej: 539000">
+        </div>
+        <div>
+          <label>Umbral tramo sueldo base (CLP)</label>
+          <input type="number" class="umbral-input" data-group="${esc(groupKey)}" value="${esc(tramoUmbral)}">
+        </div>
+      </div>
+      <div class="imm-hint"><i class="fas fa-circle-info"></i> El Ingreso Mínimo Mensual cambia por ley un par de veces al año (suele reajustarse en enero y mayo). Verifica el monto vigente para ${esc(first.mesLabel)} ${mes.slice(0,4)} antes de guardar — no asumas el mismo valor del mes anterior.</div>
+      <button class="btn btn-go btn-sm" style="margin-top:10px" data-save-group="${esc(groupKey)}"><i class="fas fa-cloud-arrow-up"></i> Guardar este mes</button>
+      <div class="statusmsg"></div>
+    </div>`;
+  }).join("");
+
+  const bulkBarHtml = order.length
+    ? `<div class="bulk-bar" id="bulkBar">
+        <button class="btn btn-go btn-sm" id="btnGuardarTodo"><i class="fas fa-layer-group"></i> Guardar todo (${order.length} mes${order.length===1?"":"es"})</button>
+        <span class="hint" style="margin:0;">Guarda todas las tarjetas de abajo en orden, una por una. Revisa el IMM de cada una antes si quieres cambiar el valor precargado.</span>
+      </div>`
+    : "";
+
+  wrap.innerHTML = errorHtml + bulkBarHtml + groupsHtml;
+
+  wrap.querySelectorAll("[data-save-group]").forEach((btn) => btn.addEventListener("click", () => saveMonthGroup(btn.dataset.saveGroup)));
+  const btnAll = document.getElementById("btnGuardarTodo");
+  if (btnAll) btnAll.addEventListener("click", saveAllGroups);
+}
+
+// Guarda TODAS las tarjetas pendientes (uno o varios clientes, uno o varios
+// meses) en orden, una por una — así se puede seleccionar de una sola vez el
+// HYD de toda la cartera de clientes y guardarlo todo con un solo clic, en
+// vez de tener que entrar tarjeta por tarjeta.
+async function saveAllGroups() {
+  const rows = Array.from(document.querySelectorAll(".file-row[data-group]"));
+  const btnAll = document.getElementById("btnGuardarTodo");
+  if (btnAll) { btnAll.disabled = true; btnAll.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando todo...'; }
+  let ok = 0, fail = 0;
+  for (const row of rows) {
+    const groupKey = row.dataset.group;
+    // Ya guardado en una pasada anterior (ej. si se hace clic de nuevo) — no
+    // repetir el trabajo.
+    if (row.querySelector(".okmsg")) { ok++; continue; }
+    const success = await saveMonthGroup(groupKey);
+    if (success) ok++; else fail++;
+  }
+  if (btnAll) {
+    btnAll.disabled = false;
+    btnAll.innerHTML = fail
+      ? `<i class="fas fa-triangle-exclamation"></i> Guardado con errores (${ok} ok, ${fail} con error)`
+      : `<i class="fas fa-circle-check"></i> Todo guardado (${ok})`;
+  }
+  toast(fail ? `Guardado con ${fail} error(es) — revisa las tarjetas marcadas en rojo.` : `Se guardaron ${ok} mes(es) correctamente.`, fail ? "warn" : "success");
+}
+
+async function saveMonthGroup(groupKey) {
+  const row = document.querySelector(`.file-row[data-group="${groupKey}"]`);
+  const statusEl = row.querySelector(".statusmsg");
+  const immInput = row.querySelector(".imm-input");
+  const umbralInput = row.querySelector(".umbral-input");
+  const imm = Number(immInput.value), tramoUmbral = Number(umbralInput.value);
+  if (!imm || imm <= 0) { statusEl.innerHTML = '<div class="errmsg">Ingresa el IMM vigente para ese mes antes de guardar.</div>'; return false; }
+  if (!tramoUmbral || tramoUmbral <= 0) { statusEl.innerHTML = '<div class="errmsg">Ingresa un umbral de tramo válido.</div>'; return false; }
+  const btn = row.querySelector("[data-save-group]");
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+  try {
+    const items = pendingFiles.filter((e) => !e.error && (e.clienteSlug + "__" + e.mes) === groupKey);
+    const rosterEntries = items.filter((e) => e.kind !== "bono");
+    const allBonoEntries = items.filter((e) => e.kind === "bono");
+    const bonoCheckbox = row.querySelector(".bono-include");
+    // El bono reliquidado solo se suma a los totales si el casillero está
+    // marcado (por defecto NO, hasta confirmar con el cliente si el bono
+    // anual es imponible o no imponible — ver nota en renderFileRows).
+    const bonoEntries = (bonoCheckbox && bonoCheckbox.checked) ? allBonoEntries : [];
+    if (!rosterEntries.length) throw new Error("Este mes no tiene ningún archivo de rol (general/privado) — sube al menos uno.");
+    const combinedRows = rosterEntries.flatMap((e) => e.rows);
+    const combinedHeaderRow = Array.from(new Set(rosterEntries.flatMap((e) => e.headerRow.filter(Boolean))));
+    const agg = computeMonthAggregate(combinedRows, imm, tramoUmbral, {
+      sourceFiles: rosterEntries.map((e) => e.file.name).concat(bonoEntries.map((e) => e.file.name)),
+      uploadedBy: user, uploadedAt: new Date().toISOString(),
+    }, combinedHeaderRow);
+
+    if (bonoEntries.length) {
+      let montoBruto = 0, impuesto = 0, aportesEmpleador = 0, nColabsBono = 0;
+      bonoEntries.forEach((e) => {
+        e.rows.forEach((r) => {
+          montoBruto += num(r["Reliquidaciones - Monto"]);
+          impuesto += num(r["Reliquidaciones - Impuesto"]);
+          aportesEmpleador += num(r["Reliquidaciones - dif_aportes_empleador"]);
+        });
+        nColabsBono += e.dotacionPreview;
+      });
+      agg.haberesTotal = (agg.haberesTotal || 0) + montoBruto;
+      // NOTA: se suma como imponible por ahora, pero el resumen de auditoría
+      // de BUK de abril-2026 lo muestra como NO imponible ("Bono Anual",
+      // $1.692.601.394) — pendiente de confirmar con el cliente. Mientras
+      // tanto el casillero de arriba viene desmarcado por defecto para no
+      // reportar una cifra sin confirmar.
+      agg.haberesImponiblesTotal = (agg.haberesImponiblesTotal || 0) + montoBruto;
+      agg.impuestoUnicoTotal = (agg.impuestoUnicoTotal || 0) + impuesto;
+      agg.aportesPatronalesTotal = (agg.aportesPatronalesTotal || 0) + aportesEmpleador;
+      agg.bonoAjuste = { montoBruto, impuesto, aportesEmpleador, colaboradores: nColabsBono, archivos: bonoEntries.map((e) => e.file.name) };
+    }
+
+    await saveMonthDoc(agg);
+    localStorage.setItem("hyd_imm_" + agg.mes, String(imm));
+    localStorage.setItem("hyd_tramo_umbral", String(tramoUmbral));
+    const idx = meses.findIndex((m) => m.clienteSlug === agg.clienteSlug && m.mes === agg.mes);
+    if (idx !== -1) meses[idx] = agg; else meses.push(agg);
+    statusEl.innerHTML = `<div class="okmsg"><i class="fas fa-circle-check"></i> Guardado: ${esc(agg.cliente)} — ${esc(agg.mesLabel)} ${agg.anio} (${agg.dotacion} colaboradores)</div>`;
+    // Se deja habilitado (no solo re-habilitado en el catch) para poder
+    // volver a guardar el mismo mes si se corrige algo — por ejemplo, tildar
+    // o destildar el casillero de "incluir bono" y guardar de nuevo.
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Guardar de nuevo';
+    toast(`${agg.cliente} — ${agg.mesLabel} ${agg.anio} guardado.`);
+    // El nombre real del cliente es el que trae el HYD ("Empresa - Nombre Empresa"),
+    // no necesariamente lo que se haya escrito al crear el cliente (puede haber
+    // diferencias de tipeo, mayúsculas, etc.) — siempre confiamos en el dato del
+    // archivo. Si todavía no hay ningún cliente seleccionado a la izquierda, se
+    // selecciona este automáticamente; si ya había uno elegido no lo pisamos
+    // (útil sobre todo al guardar varios clientes de una vez con "Guardar todo").
+    if (!curClienteSlug) { curClienteSlug = agg.clienteSlug; curClienteNombre = agg.cliente; }
+    renderClientList();
+    renderMonthList();
+    return true;
+  } catch (e) {
+    console.error(e);
+    statusEl.innerHTML = `<div class="errmsg"><i class="fas fa-triangle-exclamation"></i> ${esc(e.message)}</div>`;
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Reintentar';
+    return false;
+  }
+}
+
+// ============================================================================
+// UI: month picker + dashboard generation
+// ============================================================================
+
+function mesesDelCliente() {
+  return meses.filter((m) => m.clienteSlug === curClienteSlug).sort((a, b) => a.mes.localeCompare(b.mes));
+}
+
+function renderMonthList() {
+  const hint = document.getElementById("monthsHint");
+  const list = document.getElementById("monthList");
+  const btnGen = document.getElementById("btnGenerar");
+  const ms = mesesDelCliente();
+  if (!ms.length) {
+    hint.textContent = "Este cliente todavía no tiene ningún mes cargado.";
+    list.innerHTML = ""; btnGen.disabled = true;
+    return;
+  }
+  hint.textContent = `${ms[0].cliente} tiene ${ms.length} mes(es) cargado(s). Elige cuáles incluir en el dashboard (por defecto, todos).`;
+  list.innerHTML = ms.map((m) =>
+    `<div class="month-chip">
+      <label style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+        <input type="checkbox" class="mchk" value="${esc(m.mes)}" checked>
+        <span class="m">${esc(m.mesLabel)} ${esc(m.anio)}</span>
+        <span class="d">${m.dotacion} colaboradores</span>
+      </label>
+      <button type="button" class="btn-del-month" data-slug="${esc(m.clienteSlug)}" data-mes="${esc(m.mes)}" title="Eliminar este mes (por si quedó mal guardado)" style="background:none;border:none;color:var(--fg-muted);cursor:pointer;font-size:14px;padding:4px 6px;">
+        <i class="fas fa-trash-can"></i>
+      </button>
+    </div>`
+  ).join("");
+
+  list.querySelectorAll(".btn-del-month").forEach((btn) => btn.addEventListener("click", async () => {
+    const { slug, mes } = btn.dataset;
+    const m = meses.find((x) => x.clienteSlug === slug && x.mes === mes);
+    const label = m ? `${m.mesLabel} ${m.anio}` : mes;
+    if (!confirm(`¿Eliminar ${label} de ${m ? m.cliente : slug}? Esto borra el mes guardado — puedes volver a subir el archivo después si fue un error.`)) return;
+    btn.disabled = true;
+    try {
+      await deleteMonthDoc(slug, mes);
+      toast(`Se eliminó ${label}.`);
+      renderClientList();
+      renderMonthList();
+      clearDashboard();
+    } catch (e) {
+      console.error(e);
+      toast("No se pudo eliminar: " + e.message, "warn");
+      btn.disabled = false;
+    }
+  }));
+  btnGen.disabled = false;
+}
+
+function clearDashboard() {
+  document.getElementById("dashPreviewWrap").innerHTML = '<div class="empty-state"><i class="fas fa-chart-simple"></i>Selecciona los meses y presiona "Generar dashboard".</div>';
+  document.getElementById("btnDescargarPdf").disabled = true;
+  window._lastDashboardHTML = null;
+}
+
+document.getElementById("btnGenerar").addEventListener("click", () => {
+  const checked = Array.from(document.querySelectorAll(".mchk:checked")).map((c) => c.value);
+  const ms = mesesDelCliente().filter((m) => checked.includes(m.mes));
+  if (!ms.length) { toast("Elige al menos un mes.", "warn"); return; }
+  try {
+    const pieces = combineAggregates(ms);
+    const html = renderDashboardHTML(pieces, ECR_LOGO_SVG);
+    window._lastDashboardHTML = html;
+    const wrap = document.getElementById("dashPreviewWrap");
+    wrap.innerHTML = '<iframe id="dashFrame"></iframe>';
+    document.getElementById("dashFrame").srcdoc = html;
+    document.getElementById("btnDescargarPdf").disabled = false;
+    toast("Dashboard generado.");
+  } catch (e) {
+    console.error(e);
+    toast("No se pudo generar el dashboard: " + e.message, "warn");
+  }
+});
+
+document.getElementById("btnDescargarPdf").addEventListener("click", () => {
+  if (!window._lastDashboardHTML) return;
+  const w = window.open("", "_blank");
+  if (!w) { toast("El navegador bloqueó la ventana de impresión. Habilita las ventanas emergentes para este sitio.", "warn"); return; }
+  w.document.write(window._lastDashboardHTML);
+  w.document.close();
+  w.onload = () => setTimeout(() => w.print(), 300);
+});
+
+document.getElementById("newClientName").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const nombre = e.target.value.trim();
+    if (!nombre) return;
+    selectClient(slugify(nombre), nombre);
+    e.target.value = "";
+  }
+});
+
+document.getElementById("btnLogout").addEventListener("click", () => {
+  if (auth) signOut(auth);
+  if (unsub) unsub();
+  if (pollT) clearInterval(pollT);
+  document.getElementById("app").style.display = "none";
+  document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("loginEmail").value = "";
+  document.getElementById("loginPass").value = "";
+  document.getElementById("loginLog").innerHTML = "";
+});
+
+document.getElementById("btnLogin").addEventListener("click", doLogin);
+document.getElementById("loginPass").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
+
+// ============================================================================
+// "Revisión de procesos" — comparador mes a mes del "Resumen de Procesos para
+// auditoría" de BUK. A diferencia del dashboard HYD (que trae detalle por
+// colaborador y se agrega acá mismo), este archivo YA viene agregado por
+// concepto (no hay datos de colaboradores individuales), así que se guarda
+// tal cual — sigue la misma lógica de privacidad del resto del panel.
+//
+// El archivo de BUK no trae el nombre del cliente ni el período adentro (se
+// verificó a mano: ni las propiedades del libro ni ninguna celda lo traen),
+// así que el cliente se toma del seleccionado a la izquierda y el mes se
+// detecta del NOMBRE del archivo (ej: "Resumen de Procesos para auditoría
+// abril 2026.xls").
+//
+// Alertas (mes vs. mes anterior, para un mismo cliente), a pedido de Piera:
+//  1) un concepto aparece o desaparece de un mes a otro
+//  2) el monto de un concepto existente cambia fuerte (≥20% Y ≥$10.000)
+//  3) la cantidad de asignaciones de un concepto cambia fuerte (≥20% Y ≥2)
+// Los umbrales de "cambia fuerte" son un punto de partida para no generar
+// alertas por variaciones normales de dotación mes a mes — se pueden ajustar
+// si en la práctica salen muchas alertas de poca importancia (o muy pocas).
+// ============================================================================
+
+const AUDIT_COLLECTION = "auditoria_meses";
+let auditorias = []; // all audit month docs from Firestore, across all clients
+let unsubAuditoria = null, pollAuditoriaT = null;
+let pendingAuditFiles = []; // [{file, error, clienteSlug, cliente, mes, mesLabel, anio, conceptos, totales}]
+
+const AUDIT_MONTO_PCT = 0.20, AUDIT_MONTO_MIN_ABS = 10000;
+const AUDIT_CANT_PCT = 0.20, AUDIT_CANT_MIN_ABS = 2;
+
+function normAcc(s) { return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim(); }
+
+const MESES_MAP_INV = { "enero":"01","febrero":"02","marzo":"03","abril":"04","mayo":"05","junio":"06","julio":"07","agosto":"08","septiembre":"09","setiembre":"09","octubre":"10","noviembre":"11","diciembre":"12" };
+
+// El archivo no trae el período adentro — se detecta del nombre (ej:
+// "Resumen de Procesos para auditoría abril 2026.xls" -> "2026-04").
+function parseMesFromFilename(name) {
+  const norm = normAcc(name);
+  const yearMatch = norm.match(/20\d{2}/);
+  if (!yearMatch) return null;
+  const anio = yearMatch[0];
+  let mm = null;
+  for (const nombreMes in MESES_MAP_INV) {
+    if (norm.includes(nombreMes)) { mm = MESES_MAP_INV[nombreMes]; break; }
+  }
+  if (!mm) return null;
+  return { mes: anio + "-" + mm, mesLabel: MESES_ES[mm], anio };
+}
+
+// ----------------------------------------------------------------------
+// Firestore: colección "auditoria_meses" — mismo patrón (listener +
+// respaldo por polling + doc id "<clienteSlug>__<mes>") que "hyd_meses".
+// ----------------------------------------------------------------------
+
+function listenAuditoria() {
+  if (unsubAuditoria) unsubAuditoria();
+  unsubAuditoria = onSnapshot(collection(db, AUDIT_COLLECTION),
+    (snap) => {
+      setSyncState(true);
+      snap.docChanges().forEach((ch) => {
+        const data = ch.doc.data();
+        if (ch.type === "removed") {
+          const sep = ch.doc.id.lastIndexOf("__");
+          const slug = sep !== -1 ? ch.doc.id.slice(0, sep) : (data && data.clienteSlug);
+          const mesVal = sep !== -1 ? ch.doc.id.slice(sep + 2) : (data && data.mes);
+          const idx = auditorias.findIndex((a) => a.clienteSlug === slug && a.mes === mesVal);
+          if (idx !== -1) auditorias.splice(idx, 1);
+          return;
+        }
+        if (!data) return;
+        const idx = auditorias.findIndex((a) => a.clienteSlug === data.clienteSlug && a.mes === data.mes);
+        if (idx !== -1) auditorias[idx] = data;
+        else auditorias.push(data);
+      });
+      renderClientList();
+      renderAuditoriaAlerts();
+    },
+    (err) => {
+      console.error("Error en la conexión en tiempo real (auditoría):", err);
+      setSyncState(false);
+    }
+  );
+}
+
+function startPollingAuditoria() {
+  if (pollAuditoriaT) clearInterval(pollAuditoriaT);
+  pollAuditoriaT = setInterval(async () => {
+    try {
+      const snap = await getDocs(collection(db, AUDIT_COLLECTION));
+      const fresh = [];
+      snap.forEach((d) => fresh.push(d.data()));
+      auditorias = fresh;
+      renderClientList();
+      renderAuditoriaAlerts();
+      setSyncState(true);
+    } catch (e) {
+      console.error("Error en la actualización periódica (auditoría):", e);
+    }
+  }, 15000);
+}
+
+async function saveAuditoriaMonthDoc(rec) {
+  const id = rec.clienteSlug + "__" + rec.mes;
+  await setDoc(doc(db, AUDIT_COLLECTION, id), rec);
+}
+
+async function deleteAuditoriaMonthDoc(clienteSlug, mes) {
+  const id = clienteSlug + "__" + mes;
+  await deleteDoc(doc(db, AUDIT_COLLECTION, id));
+  const idx = auditorias.findIndex((a) => a.clienteSlug === clienteSlug && a.mes === mes);
+  if (idx !== -1) auditorias.splice(idx, 1);
+}
+
+// ----------------------------------------------------------------------
+// UI: pestañas (Dashboard / Revisión de procesos)
+// ----------------------------------------------------------------------
+
+function switchTab(tab) {
+  document.getElementById("viewDashboard").style.display = tab === "dashboard" ? "" : "none";
+  document.getElementById("viewAuditoria").style.display = tab === "auditoria" ? "" : "none";
+  document.getElementById("viewDj1887").style.display = tab === "dj1887" ? "" : "none";
+  document.getElementById("tabBtnDashboard").classList.toggle("active", tab === "dashboard");
+  document.getElementById("tabBtnAuditoria").classList.toggle("active", tab === "auditoria");
+  document.getElementById("tabBtnDj1887").classList.toggle("active", tab === "dj1887");
+  if (tab === "auditoria") refreshAuditoriaClientUI();
+}
+document.getElementById("tabBtnDashboard").addEventListener("click", () => switchTab("dashboard"));
+document.getElementById("tabBtnAuditoria").addEventListener("click", () => switchTab("auditoria"));
+document.getElementById("tabBtnDj1887").addEventListener("click", () => switchTab("dj1887"));
+
+function refreshAuditoriaClientUI() {
+  const nameEl = document.getElementById("auditoriaClienteName");
+  const hintEl = document.getElementById("auditoriaUploadHint");
+  const zoneEl = document.getElementById("auditoriaDropZone");
+  if (!curClienteSlug) {
+    nameEl.textContent = "-";
+    hintEl.textContent = 'Selecciona un cliente a la izquierda primero (o crea uno nuevo escribiendo su nombre) — a diferencia del HYD, el "Resumen de Procesos para auditoría" de BUK no trae el nombre del cliente adentro del archivo, así que hay que indicarlo aparte.';
+    zoneEl.style.display = "none";
+  } else {
+    const nombre = curClienteNombre || curClienteSlug;
+    nameEl.textContent = nombre;
+    hintEl.textContent = `Sube uno o varios archivos "Resumen de Procesos para auditoría" (.xls/.xlsx) de ${nombre}. El mes de cada uno se detecta del nombre del archivo (ej: "...abril 2026.xls") — revisa que quede correcto antes de guardar.`;
+    zoneEl.style.display = "";
+  }
+  renderAuditoriaAlerts();
+}
+
+// ----------------------------------------------------------------------
+// UI: subida de archivos de auditoría
+// ----------------------------------------------------------------------
+
+const auditoriaDropZone = document.getElementById("auditoriaDropZone");
+const auditoriaFileInput = document.getElementById("auditoriaFileInput");
+auditoriaDropZone.addEventListener("click", () => auditoriaFileInput.click());
+auditoriaDropZone.addEventListener("dragover", (e) => { e.preventDefault(); auditoriaDropZone.classList.add("drag"); });
+auditoriaDropZone.addEventListener("dragleave", () => auditoriaDropZone.classList.remove("drag"));
+auditoriaDropZone.addEventListener("drop", (e) => {
+  e.preventDefault(); auditoriaDropZone.classList.remove("drag");
+  handleAuditoriaFiles(e.dataTransfer.files);
+});
+auditoriaFileInput.addEventListener("change", (e) => { handleAuditoriaFiles(e.target.files); auditoriaFileInput.value = ""; });
+
+// Columnas esperadas en la fila de encabezados del "Resumen de Procesos para
+// auditoría" (ubicada unas filas más abajo del inicio del archivo, después de
+// 2 filas de metadata "Libro:"/"Fecha Generación:" y filas en blanco).
+// "Sobregiro" es la única opcional (algunos meses puede no traerla con datos).
+const AUDIT_REQUIRED_COLS = ["item","cantidad de asignaciones","haberes imponibles","haberes no imponibles","leyes sociales","descuentos","aportes empresa","sueldo liquido"];
+
+// Conceptos que NO se tratan como un "haber no imponible" real, aunque BUK
+// los liste en el resumen de auditoría: "Sueldo líquido" es un resultado
+// derivado (no un concepto de remuneración), y "Depósito Convenido" aparece
+// a la vez como haber Y como descuento por el mismo monto (y también como
+// aporte empresa) — se netea a $0 para el colaborador, así que no debe
+// contarse ni compararse mes a mes como si fuera un ingreso real (a pedido
+// de Piera, tras revisar abril-2026: Haberes No Imponibles $72.216.360 =
+// Descuentos $72.216.360 = Aportes Empresa $72.216.360, exactamente el
+// mismo monto en las 3 columnas).
+const AUDIT_EXCLUDED_CONCEPTOS = ["sueldo liquido", "deposito convenido"];
+
+function parseAuditoriaAOA(aoa) {
+  let headerIdx = -1, colIdx = null;
+  for (let i = 0; i < aoa.length; i++) {
+    const row = aoa[i] || [];
+    const normRow = row.map((c) => normAcc(c));
+    if (normRow[0] === "item" && normRow.includes("cantidad de asignaciones")) {
+      headerIdx = i;
+      colIdx = {};
+      row.forEach((c, idx) => { colIdx[normAcc(c)] = idx; });
+      break;
+    }
+  }
+  if (headerIdx === -1) throw new Error('No se encontró la fila de encabezados ("Ítem", "Cantidad de Asignaciones", ...) en este archivo. ¿Es un "Resumen de Procesos para auditoría" de BUK?');
+  const missing = AUDIT_REQUIRED_COLS.filter((c) => !(c in colIdx));
+  if (missing.length) throw new Error("Faltan columnas esenciales en el resumen de auditoría: " + missing.join(", "));
+  const hasSobregiro = "sobregiro" in colIdx;
+  const g = (row, key) => { const idx = colIdx[key]; return idx == null ? null : row[idx]; };
+  const conceptos = [];
+  let totales = null;
+  for (let i = headerIdx + 1; i < aoa.length; i++) {
+    const row = aoa[i] || [];
+    const nombre = g(row, "item");
+    if (nombre == null || String(nombre).trim() === "") continue;
+    const nombreNorm = normAcc(nombre);
+    if (AUDIT_EXCLUDED_CONCEPTOS.includes(nombreNorm)) continue;
+    const rec = {
+      nombre: String(nombre).trim(),
+      cantidadAsignaciones: num(g(row, "cantidad de asignaciones")),
+      haberesImponibles: num(g(row, "haberes imponibles")),
+      haberesNoImponibles: num(g(row, "haberes no imponibles")),
+      leyesSociales: num(g(row, "leyes sociales")),
+      descuentos: num(g(row, "descuentos")),
+      aportesEmpresa: num(g(row, "aportes empresa")),
+      sobregiro: hasSobregiro ? num(g(row, "sobregiro")) : 0,
+      sueldoLiquido: num(g(row, "sueldo liquido")),
+    };
+    if (nombreNorm === "total") {
+      totales = rec;
+      break; // no hay nada útil después de la fila Total
+    }
+    conceptos.push(rec);
+  }
+  if (!totales) throw new Error('No se encontró la fila "Total" en este archivo.');
+  return { conceptos, totales };
+}
+
+// Monto total de un concepto (todo lo que suma a la liquidación, sin contar
+// el sueldo líquido que es un resultado derivado, no un componente aparte).
+function montoConcepto(c) {
+  return c.haberesImponibles + c.haberesNoImponibles + c.leyesSociales + c.descuentos + c.aportesEmpresa + (c.sobregiro || 0);
+}
+
+async function handleAuditoriaFiles(fileList) {
+  if (!curClienteSlug) { toast("Elige un cliente a la izquierda (o escribe uno nuevo) antes de subir el resumen de auditoría.", "warn"); return; }
+  for (const file of Array.from(fileList)) {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+      const parsed = parseAuditoriaAOA(aoa);
+      const periodo = parseMesFromFilename(file.name);
+      if (!periodo) throw new Error('No se pudo detectar el mes desde el nombre del archivo. Verifica que incluya el mes y el año (ej: "Resumen de Procesos para auditoría abril 2026.xls").');
+      pendingAuditFiles.push({
+        file, error: null,
+        clienteSlug: curClienteSlug, cliente: curClienteNombre || curClienteSlug,
+        mes: periodo.mes, mesLabel: periodo.mesLabel, anio: periodo.anio,
+        conceptos: parsed.conceptos, totales: parsed.totales,
+      });
+    } catch (e) {
+      pendingAuditFiles.push({ file, error: e.message });
+    }
+  }
+  renderAuditoriaFileRows();
+}
+
+function renderAuditoriaFileRows() {
+  const wrap = document.getElementById("auditoriaFileRows");
+  const errorHtml = pendingAuditFiles.filter((e) => e.error).map((entry) => `
+    <div class="file-row err">
+      <div class="fname"><i class="fas fa-file-excel"></i> ${esc(entry.file.name)}</div>
+      <div class="errmsg"><i class="fas fa-triangle-exclamation"></i> ${esc(entry.error)}</div>
+    </div>`).join("");
+
+  const groups = {}; const order = [];
+  pendingAuditFiles.forEach((entry) => {
+    if (entry.error) return;
+    if (!groups[entry.mes]) { groups[entry.mes] = []; order.push(entry.mes); }
+    groups[entry.mes].push(entry);
+  });
+  order.sort();
+
+  const groupsHtml = order.map((mes) => {
+    const items = groups[mes];
+    const entry = items[items.length - 1]; // si se sube 2 veces el mismo mes, se usa el último
+    const filesListHtml = items.map((e) => `<div class="fname" style="font-size:11.5px;font-weight:400;"><i class="fas fa-file-excel"></i> ${esc(e.file.name)}</div>`).join("");
+    return `<div class="file-row" data-mes="${esc(mes)}">
+      <div class="fmeta" style="font-weight:600;">${esc(entry.cliente)} &middot; ${esc(entry.mesLabel)} ${entry.anio} &middot; ${entry.conceptos.length} conceptos &middot; total haberes ${fmtClp(entry.totales.haberesImponibles + entry.totales.haberesNoImponibles)}</div>
+      ${filesListHtml}
+      <button class="btn btn-go btn-sm" style="margin-top:10px" data-save-audit-mes="${esc(mes)}"><i class="fas fa-cloud-arrow-up"></i> Guardar este mes</button>
+      <div class="statusmsg"></div>
+    </div>`;
+  }).join("");
+
+  const bulkBarHtml = order.length
+    ? `<div class="bulk-bar" id="auditoriaBulkBar">
+        <button class="btn btn-go btn-sm" id="btnGuardarTodoAuditoria"><i class="fas fa-layer-group"></i> Guardar todo (${order.length} mes${order.length===1?"":"es"})</button>
+        <span class="hint" style="margin:0;">Guarda todos los meses de abajo, de ${esc(curClienteNombre || curClienteSlug)}, en un solo clic.</span>
+      </div>`
+    : "";
+
+  wrap.innerHTML = errorHtml + bulkBarHtml + groupsHtml;
+  wrap.querySelectorAll("[data-save-audit-mes]").forEach((btn) => btn.addEventListener("click", () => saveAuditoriaMonth(btn.dataset.saveAuditMes)));
+  const btnAll = document.getElementById("btnGuardarTodoAuditoria");
+  if (btnAll) btnAll.addEventListener("click", saveAllAuditoriaMonths);
+}
+
+async function saveAuditoriaMonth(mes) {
+  const row = document.querySelector(`#auditoriaFileRows .file-row[data-mes="${mes}"]`);
+  const statusEl = row.querySelector(".statusmsg");
+  const btn = row.querySelector("[data-save-audit-mes]");
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+  try {
+    const items = pendingAuditFiles.filter((e) => !e.error && e.mes === mes);
+    const entry = items[items.length - 1];
+    const rec = {
+      clienteSlug: entry.clienteSlug, cliente: entry.cliente,
+      mes: entry.mes, mesLabel: entry.mesLabel, anio: entry.anio,
+      conceptos: entry.conceptos, totales: entry.totales,
+      sourceFiles: items.map((e) => e.file.name),
+      uploadedBy: user, uploadedAt: new Date().toISOString(),
+    };
+    await saveAuditoriaMonthDoc(rec);
+    const idx = auditorias.findIndex((a) => a.clienteSlug === rec.clienteSlug && a.mes === rec.mes);
+    if (idx !== -1) auditorias[idx] = rec; else auditorias.push(rec);
+    statusEl.innerHTML = `<div class="okmsg"><i class="fas fa-circle-check"></i> Guardado: ${esc(rec.cliente)} — ${esc(rec.mesLabel)} ${rec.anio}</div>`;
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Guardar de nuevo';
+    toast(`${rec.cliente} — ${rec.mesLabel} ${rec.anio} (auditoría) guardado.`);
+    renderClientList();
+    renderAuditoriaAlerts();
+    return true;
+  } catch (e) {
+    console.error(e);
+    statusEl.innerHTML = `<div class="errmsg"><i class="fas fa-triangle-exclamation"></i> ${esc(e.message)}</div>`;
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Reintentar';
+    return false;
+  }
+}
+
+async function saveAllAuditoriaMonths() {
+  const rows = Array.from(document.querySelectorAll("#auditoriaFileRows .file-row[data-mes]"));
+  const btnAll = document.getElementById("btnGuardarTodoAuditoria");
+  if (btnAll) { btnAll.disabled = true; btnAll.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando todo...'; }
+  let ok = 0, fail = 0;
+  for (const row of rows) {
+    const mes = row.dataset.mes;
+    if (row.querySelector(".okmsg")) { ok++; continue; }
+    const success = await saveAuditoriaMonth(mes);
+    if (success) ok++; else fail++;
+  }
+  if (btnAll) {
+    btnAll.disabled = false;
+    btnAll.innerHTML = fail
+      ? `<i class="fas fa-triangle-exclamation"></i> Guardado con errores (${ok} ok, ${fail} con error)`
+      : `<i class="fas fa-circle-check"></i> Todo guardado (${ok})`;
+  }
+  toast(fail ? `Guardado con ${fail} error(es) — revisa las tarjetas marcadas en rojo.` : `Se guardaron ${ok} mes(es) correctamente.`, fail ? "warn" : "success");
+}
+
+// ----------------------------------------------------------------------
+// Alertas: compara cada mes contra el mes anterior (mismo cliente).
+// ----------------------------------------------------------------------
+
+function computeAuditAlerts(sortedMonthDocs) {
+  const alerts = [];
+  for (let i = 1; i < sortedMonthDocs.length; i++) {
+    const prev = sortedMonthDocs[i - 1], curr = sortedMonthDocs[i];
+    const prevByName = {}; (prev.conceptos || []).forEach((c) => { prevByName[normAcc(c.nombre)] = c; });
+    const currByName = {}; (curr.conceptos || []).forEach((c) => { currByName[normAcc(c.nombre)] = c; });
+    const allKeys = new Set([...Object.keys(prevByName), ...Object.keys(currByName)]);
+    allKeys.forEach((key) => {
+      const p = prevByName[key], c = currByName[key];
+      const label = (c || p).nombre;
+      // Además del texto (desc, para las tarjetas y el prompt de la IA), cada
+      // alerta trae sus valores numéricos sueltos (mesAnteriorLabel, montos,
+      // cantidades, variación) — así la exportación a Excel puede armar
+      // columnas de verdad en vez de tener que desarmar el texto.
+      if (!p && c) {
+        alerts.push({ tipo: "aparecio", mes: curr.mes, mesLabel: curr.mesLabel, anio: curr.anio, concepto: label,
+          mesAnteriorLabel: `${prev.mesLabel} ${prev.anio}`, cantidadAnterior: null, cantidadActual: c.cantidadAsignaciones,
+          montoAnterior: null, montoActual: montoConcepto(c), variacionPct: null,
+          desc: `"${label}" es nuevo este mes — no aparecía en ${prev.mesLabel} ${prev.anio}. ${c.cantidadAsignaciones} asignación(es), ${fmtClp(montoConcepto(c))}.` });
+        return;
+      }
+      if (p && !c) {
+        alerts.push({ tipo: "desaparecio", mes: curr.mes, mesLabel: curr.mesLabel, anio: curr.anio, concepto: label,
+          mesAnteriorLabel: `${prev.mesLabel} ${prev.anio}`, cantidadAnterior: p.cantidadAsignaciones, cantidadActual: null,
+          montoAnterior: montoConcepto(p), montoActual: null, variacionPct: null,
+          desc: `"${label}" desapareció este mes — en ${prev.mesLabel} ${prev.anio} tenía ${p.cantidadAsignaciones} asignación(es), ${fmtClp(montoConcepto(p))}.` });
+        return;
+      }
+      const montoP = montoConcepto(p), montoC = montoConcepto(c);
+      const diffMonto = montoC - montoP;
+      const pctMonto = montoP !== 0 ? Math.abs(diffMonto) / Math.abs(montoP) : (montoC !== 0 ? 1 : 0);
+      if (Math.abs(diffMonto) >= AUDIT_MONTO_MIN_ABS && pctMonto >= AUDIT_MONTO_PCT) {
+        alerts.push({ tipo: "monto", mes: curr.mes, mesLabel: curr.mesLabel, anio: curr.anio, concepto: label,
+          mesAnteriorLabel: `${prev.mesLabel} ${prev.anio}`, cantidadAnterior: p.cantidadAsignaciones, cantidadActual: c.cantidadAsignaciones,
+          montoAnterior: montoP, montoActual: montoC, variacionPct: diffMonto >= 0 ? pctMonto : -pctMonto,
+          desc: `"${label}" pasó de ${fmtClp(montoP)} a ${fmtClp(montoC)} (${diffMonto >= 0 ? "+" : ""}${fmt(pctMonto * 100, 1)}%) respecto a ${prev.mesLabel} ${prev.anio}.` });
+      }
+      const diffCant = c.cantidadAsignaciones - p.cantidadAsignaciones;
+      const pctCant = p.cantidadAsignaciones !== 0 ? Math.abs(diffCant) / Math.abs(p.cantidadAsignaciones) : (c.cantidadAsignaciones !== 0 ? 1 : 0);
+      if (Math.abs(diffCant) >= AUDIT_CANT_MIN_ABS && pctCant >= AUDIT_CANT_PCT) {
+        alerts.push({ tipo: "cantidad", mes: curr.mes, mesLabel: curr.mesLabel, anio: curr.anio, concepto: label,
+          mesAnteriorLabel: `${prev.mesLabel} ${prev.anio}`, cantidadAnterior: p.cantidadAsignaciones, cantidadActual: c.cantidadAsignaciones,
+          montoAnterior: montoP, montoActual: montoC, variacionPct: diffCant >= 0 ? pctCant : -pctCant,
+          desc: `La cantidad de asignaciones de "${label}" pasó de ${p.cantidadAsignaciones} a ${c.cantidadAsignaciones} (${diffCant >= 0 ? "+" : ""}${diffCant}) respecto a ${prev.mesLabel} ${prev.anio}.` });
+      }
+    });
+  }
+  alerts.sort((a, b) => b.mes.localeCompare(a.mes));
+  return alerts;
+}
+
+const AUDIT_TYPE_META = {
+  desaparecio: { cls: "t-desaparecio", icon: "fa-circle-minus", label: "Concepto desapareció" },
+  aparecio: { cls: "t-aparecio", icon: "fa-circle-plus", label: "Concepto nuevo" },
+  monto: { cls: "t-monto", icon: "fa-money-bill-trend-up", label: "Cambio de monto" },
+  cantidad: { cls: "t-cantidad", icon: "fa-users", label: "Cambio de cantidad" },
+};
+
+function renderAuditoriaAlerts() {
+  const hint = document.getElementById("auditoriaAlertsHint");
+  const list = document.getElementById("auditoriaAlertsList");
+  // Cualquier análisis de IA que estuviera en pantalla queda obsoleto en
+  // cuanto cambian los datos o el cliente elegido — se limpia acá para no
+  // mostrar un análisis que ya no corresponde a las alertas actuales.
+  document.getElementById("auditoriaIaResult").innerHTML = "";
+  if (!curClienteSlug) {
+    hint.textContent = "Elige un cliente a la izquierda para ver sus alertas mes a mes.";
+    list.innerHTML = "";
+    updateIaButtonState(0);
+    return;
+  }
+  const nombre = curClienteNombre || curClienteSlug;
+  const docs = auditorias.filter((a) => a.clienteSlug === curClienteSlug).sort((a, b) => a.mes.localeCompare(b.mes));
+  if (docs.length < 2) {
+    hint.textContent = docs.length === 0
+      ? `${nombre} todavía no tiene ningún resumen de auditoría cargado — sube el primero arriba.`
+      : `${nombre} tiene solo 1 mes cargado — sube al menos un segundo mes para poder comparar y generar alertas.`;
+    list.innerHTML = "";
+    updateIaButtonState(0);
+    return;
+  }
+  const alerts = computeAuditAlerts(docs);
+  hint.textContent = `${nombre} — ${docs.length} meses cargados. ${alerts.length} alerta(s) detectada(s) comparando mes a mes.`;
+  if (!alerts.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-circle-check"></i>Sin alertas — no se detectaron cambios grandes entre meses consecutivos.</div>';
+    updateIaButtonState(0);
+    return;
+  }
+  const byMonth = {}; const order = [];
+  alerts.forEach((al) => {
+    if (!byMonth[al.mes]) { byMonth[al.mes] = []; order.push(al.mes); }
+    byMonth[al.mes].push(al);
+  });
+  list.innerHTML = order.map((mes) => {
+    const items = byMonth[mes];
+    const cardsHtml = items.map((al) => {
+      const meta = AUDIT_TYPE_META[al.tipo];
+      return `<div class="alert-card ${meta.cls}">
+        <div class="a-ic"><i class="fas ${meta.icon}"></i></div>
+        <div class="a-body">
+          <div class="a-title">${esc(meta.label)} — ${esc(al.concepto)}</div>
+          <div class="a-desc">${esc(al.desc)}</div>
+        </div>
+      </div>`;
+    }).join("");
+    return `<div class="alert-month-group">${esc(items[0].mesLabel)} ${mes.slice(0,4)}</div>${cardsHtml}`;
+  }).join("");
+  updateIaButtonState(alerts.length);
+}
+
+// ----------------------------------------------------------------------
+// "Analizar con IA": experto en remuneraciones que explica las alertas de
+// arriba. Se llama DIRECTO a la API de Anthropic desde el navegador con la
+// clave que la propia usuaria ingresa (no una clave nuestra) — así el
+// archivo del panel nunca lleva una clave escrita adentro, y el costo de
+// cada análisis es transparente (queda a la cuenta de Anthropic de quien la
+// ingresó). No se guarda nada de esto en Firestore, solo en localStorage de
+// este navegador.
+// ----------------------------------------------------------------------
+
+const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-5-20250929";
+
+function updateIaButtonState(nAlerts) {
+  const btn = document.getElementById("btnAnalizarIA");
+  if (!btn) return;
+  const keyInput = document.getElementById("anthropicApiKey");
+  const hasKey = !!(keyInput && keyInput.value.trim());
+  const n = typeof nAlerts === "number" ? nAlerts : document.querySelectorAll("#auditoriaAlertsList .alert-card").length;
+  btn.disabled = !hasKey || !curClienteSlug || n === 0;
+  // El Excel de la tabla de alertas no necesita clave de IA — solo que haya
+  // alertas que exportar.
+  const btnExcel = document.getElementById("btnDescargarAlertasExcel");
+  if (btnExcel) btnExcel.disabled = !curClienteSlug || n === 0;
+}
+
+function initIaSettings() {
+  const keyInput = document.getElementById("anthropicApiKey");
+  const modelInput = document.getElementById("anthropicModel");
+  keyInput.value = localStorage.getItem("hyd_anthropic_key") || "";
+  modelInput.value = localStorage.getItem("hyd_anthropic_model") || ANTHROPIC_DEFAULT_MODEL;
+  keyInput.addEventListener("input", () => updateIaButtonState());
+  keyInput.addEventListener("change", () => { localStorage.setItem("hyd_anthropic_key", keyInput.value.trim()); });
+  modelInput.addEventListener("change", () => { localStorage.setItem("hyd_anthropic_model", modelInput.value.trim() || ANTHROPIC_DEFAULT_MODEL); });
+  document.getElementById("btnAnalizarIA").addEventListener("click", analizarConIA);
+  document.getElementById("btnDescargarAlertasExcel").addEventListener("click", descargarAlertasExcel);
+}
+initIaSettings();
+
+// Se guarda el último análisis de IA generado (texto + cliente) para poder
+// armar el Word al tiro, sin tener que volver a llamar a la IA.
+let lastIaAnalysisText = null;
+let lastIaAnalysisCliente = null;
+
+function renderIaResult(texto, nombre) {
+  lastIaAnalysisText = texto;
+  lastIaAnalysisCliente = nombre;
+  const resultEl = document.getElementById("auditoriaIaResult");
+  const parrafos = texto.split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+  resultEl.innerHTML = `
+    <div class="ia-disclaimer"><i class="fas fa-circle-info"></i> Análisis generado por IA como apoyo — no reemplaza la asesoría de tu equipo legal/laboral ni una revisión con los criterios vigentes de la Dirección del Trabajo.</div>
+    <div class="ia-text">${parrafos}</div>
+    <button class="btn btn-sec btn-sm" id="btnDescargarAnalisisWord" style="margin-top:12px;width:auto;"><i class="fas fa-file-word"></i> Descargar análisis (Word)</button>
+  `;
+  document.getElementById("btnDescargarAnalisisWord").addEventListener("click", descargarAnalisisWord);
+}
+
+// ----------------------------------------------------------------------
+// Descargas: tabla de alertas en Excel (con SheetJS, ya cargado para leer
+// los HYD/auditoría, también sabe escribir) y el análisis de IA en Word
+// (truco clásico: un .doc es, para Word, simplemente HTML con esas etiquetas
+// xmlns de Office — no hace falta ninguna librería nueva para esto).
+// ----------------------------------------------------------------------
+
+// Separado en "armar los datos" (buildAlertsExportRows / buildAnalisisWordHtml
+// — fácil de probar directo, sin tocar el DOM ni disparar una descarga real)
+// y "armar el archivo y descargarlo" (las funciones descargarX de abajo).
+function buildAlertsExportRows() {
+  if (!curClienteSlug) return null;
+  const docs = auditorias.filter((a) => a.clienteSlug === curClienteSlug).sort((a, b) => a.mes.localeCompare(b.mes));
+  const alerts = computeAuditAlerts(docs).sort((a, b) => a.mes.localeCompare(b.mes));
+  if (!alerts.length) return null;
+  return alerts.map((al) => ({
+    "Mes": `${al.mesLabel} ${al.anio}`,
+    "Tipo de alerta": AUDIT_TYPE_META[al.tipo].label,
+    "Concepto": al.concepto,
+    "Mes de comparación": al.mesAnteriorLabel,
+    "Cantidad anterior": al.cantidadAnterior,
+    "Cantidad actual": al.cantidadActual,
+    "Monto anterior (CLP)": al.montoAnterior,
+    "Monto actual (CLP)": al.montoActual,
+    "Variación %": al.variacionPct != null ? Math.round(al.variacionPct * 1000) / 10 : null,
+    "Descripción": al.desc,
+  }));
+}
+
+function descargarAlertasExcel() {
+  if (!curClienteSlug) { toast("Elige un cliente primero.", "warn"); return; }
+  const nombre = curClienteNombre || curClienteSlug;
+  const filas = buildAlertsExportRows();
+  if (!filas) { toast("No hay alertas para exportar.", "warn"); return; }
+  const ws = XLSX.utils.json_to_sheet(filas);
+  ws["!cols"] = [{ wch: 12 }, { wch: 20 }, { wch: 30 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 70 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Alertas");
+  const fecha = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `alertas_auditoria_${slugify(nombre)}_${fecha}.xlsx`);
+  toast("Excel descargado.");
+}
+
+function buildAnalisisWordHtml() {
+  if (!lastIaAnalysisText) return null;
+  const parrafosHtml = lastIaAnalysisText.split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+  const fecha = new Date().toLocaleDateString("es-CL");
+  return `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset="utf-8"><title>Análisis de revisión de procesos</title></head>
+<body style="font-family:Calibri,Arial,sans-serif;">
+<h1 style="font-size:20px;color:#1B2A4A;">Análisis de revisión de procesos — ${esc(lastIaAnalysisCliente)}</h1>
+<p style="font-size:11px;color:#666666;">Generado el ${esc(fecha)}</p>
+<p style="font-size:11px;font-style:italic;background:#FFF4E0;padding:8px;border-left:3px solid #F7931E;">Análisis generado por IA como apoyo — no reemplaza la asesoría de tu equipo legal/laboral ni una revisión con los criterios vigentes de la Dirección del Trabajo.</p>
+${parrafosHtml}
+</body></html>`;
+}
+// Se exponen en window solo para poder probarlas directo (page.evaluate) en
+// el QA, sin tocar el DOM ni disparar una descarga real — el resto del
+// código del módulo sigue privado como siempre.
+window.buildAlertsExportRows = buildAlertsExportRows;
+window.buildAnalisisWordHtml = buildAnalisisWordHtml;
+
+function descargarAnalisisWord() {
+  const htmlDoc = buildAnalisisWordHtml();
+  if (!htmlDoc) { toast("Primero genera un análisis con IA.", "warn"); return; }
+  const blob = new Blob(["﻿", htmlDoc], { type: "application/msword" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `analisis_ia_${slugify(lastIaAnalysisCliente)}_${new Date().toISOString().slice(0, 10)}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast("Word descargado.");
+}
+
+async function analizarConIA() {
+  const key = document.getElementById("anthropicApiKey").value.trim();
+  const model = document.getElementById("anthropicModel").value.trim() || ANTHROPIC_DEFAULT_MODEL;
+  if (!key) { toast("Ingresa tu clave de API de Anthropic primero.", "warn"); return; }
+  if (!curClienteSlug) { toast("Elige un cliente primero.", "warn"); return; }
+  const nombre = curClienteNombre || curClienteSlug;
+  const docs = auditorias.filter((a) => a.clienteSlug === curClienteSlug).sort((a, b) => a.mes.localeCompare(b.mes));
+  const alerts = computeAuditAlerts(docs);
+  if (!alerts.length) { toast("No hay alertas para analizar.", "warn"); return; }
+
+  const btn = document.getElementById("btnAnalizarIA");
+  const resultEl = document.getElementById("auditoriaIaResult");
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analizando...';
+  resultEl.innerHTML = '<div class="ia-loading"><i class="fas fa-spinner fa-spin"></i> Consultando IA...</div>';
+
+  try {
+    const byMonth = {};
+    alerts.forEach((al) => { (byMonth[al.mes] = byMonth[al.mes] || []).push(al); });
+    const mesesOrdenados = Object.keys(byMonth).sort();
+    const alertasTexto = mesesOrdenados.map((mes) => {
+      const items = byMonth[mes];
+      const lineas = items.map((al) => `- [${AUDIT_TYPE_META[al.tipo].label}] ${al.desc}`).join("\n");
+      return `${items[0].mesLabel} ${mes.slice(0, 4)}:\n${lineas}`;
+    }).join("\n\n");
+
+    const prompt = `Eres un experto en remuneraciones y compliance laboral en Chile, familiarizado con los criterios generales de la Dirección del Trabajo (DT) sobre haberes imponibles/no imponibles, cotizaciones y buenas prácticas de auditoría de procesos de remuneraciones.
+
+Te paso las alertas detectadas al comparar mes a mes el "Resumen de Procesos para auditoría" de BUK del cliente ${nombre}. Cada alerta indica que un concepto de remuneración apareció, desapareció, o cambió fuerte de monto o de cantidad de asignaciones respecto al mes anterior.
+
+Para cada mes, agrupa y explica en pocas líneas por qué las alertas más relevantes podrían importar (riesgo operacional, de cumplimiento, o simplemente un cambio normal de dotación) y qué recomendarías revisar primero. Sé concreto y priorizado — si varias alertas cuentan la misma historia (ej: una reliquidación puntual que trae varios conceptos nuevos el mismo mes), agrúpalas en vez de repetirlas una por una.
+
+Importante: no des una determinación legal definitiva sobre si un concepto es imponible o no imponible, ni sobre cumplimiento normativo. Cuando el tema lo amerite, indica que conviene confirmarlo con el equipo legal/laboral de la empresa o con los criterios vigentes de la Dirección del Trabajo, ya que estos dependen del caso concreto y pueden cambiar.
+
+Responde en español, en tono profesional y directo, organizado por mes.
+
+Alertas:
+${alertasTexto}`;
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!resp.ok) {
+      let detail = "";
+      try { detail = (await resp.json()).error?.message || ""; } catch (e2) { /* ignore */ }
+      throw new Error(`Error ${resp.status}${detail ? " — " + detail : ""}`);
+    }
+    const data = await resp.json();
+    const texto = (data.content || []).map((b) => b.text || "").join("\n").trim();
+    if (!texto) throw new Error("La IA no devolvió texto.");
+    renderIaResult(texto, nombre);
+    toast("Análisis con IA generado.");
+  } catch (e) {
+    console.error(e);
+    resultEl.innerHTML = `<div class="errmsg"><i class="fas fa-triangle-exclamation"></i> No se pudo generar el análisis: ${esc(e.message)}</div>`;
+    toast("No se pudo generar el análisis con IA: " + e.message, "warn");
+  } finally {
+    updateIaButtonState();
+    btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Analizar con IA';
+  }
+}
+
+// Al abrir: si este archivo ya trae el proyecto de Firebase incorporado
+// (HARDCODED_FIREBASE_CONFIG), se salta directo a la pantalla de acceso —
+// nadie necesita ver ni tocar los 6 datos, solo su correo y contraseña.
+// Si no lo trae (por ejemplo, una copia de este archivo antes de configurar
+// el proyecto), se pide configurarlo una vez y queda guardado en ese navegador.
+document.getElementById("btnGo").addEventListener("click", go);
+document.getElementById("btnClr").addEventListener("click", () => {
+  localStorage.removeItem("hyd_fb");
+  localStorage.removeItem("hyd_fb_dbid");
+  localStorage.removeItem("hyd_user");
+  ["c1", "c2", "c3", "c4", "c5", "c6", "c7"].forEach((id) => { document.getElementById(id).value = ""; });
+  toast("Datos limpiados", "info");
+});
+
+if (HARDCODED_FIREBASE_CONFIG.apiKey && HARDCODED_FIREBASE_CONFIG.projectId) {
+  initFirebase(HARDCODED_FIREBASE_CONFIG, HARDCODED_DATABASE_ID);
+  showLogin();
+} else {
+const savedCfg = JSON.parse(localStorage.getItem("hyd_fb") || "null");
+const savedDbId = localStorage.getItem("hyd_fb_dbid") || "";
+if (savedCfg && savedCfg.apiKey && savedCfg.projectId) {
+  initFirebase(savedCfg, savedDbId);
+  showLogin();
+} else {
+  document.getElementById("c1").value = savedCfg?.apiKey || "";
+  document.getElementById("c2").value = savedCfg?.authDomain || "";
+  document.getElementById("c3").value = savedCfg?.projectId || "";
+  document.getElementById("c4").value = savedCfg?.storageBucket || "";
+  document.getElementById("c5").value = savedCfg?.messagingSenderId || "";
+  document.getElementById("c6").value = savedCfg?.appId || "";
+  document.getElementById("c7").value = savedDbId || "";
+}
+}
+
+// ============================================================================
+// HYD calculation / chart / render library — port of the Cowork-skill Python
+// pipeline (extract_and_compute.py + charts.py + render_html.py). See that
+// skill for the reference implementation this was validated against.
+// Privacy rule: only aggregated per-month indicators are ever computed here
+// and written to Firestore — never a raw per-employee row.
+// ============================================================================
+
+const MESES_ES = { "01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"Jun","07":"Jul","08":"Ago","09":"Sep","10":"Oct","11":"Nov","12":"Dic" };
+const HYD_ESSENTIAL = ["Empresa - Nombre Empresa","Liquidación - Período","Trabajo - Tipo de Contrato","Trabajo - Fecha Ingreso Compañía","Trabajo - Fecha Término Trabajo","Trabajo - Sueldo Base","Liquidación - Sueldo Líquido","Liquidación - Días Licencias (reales)","Liquidación - Días Ausencias","Trabajo - Centro de Costo","Colaborador - Fecha de Nacimiento"];
+const PALETTE = { blue:"#0072BC", orange:"#F7931E", aqua:"#1baf7a", yellow:"#eda100", magenta:"#e87ba4", green:"#008300", violet:"#4a3aa7", red:"#e34948", navy:"#1B2A4A" };
+const INK_PRIMARY = "#0b0b0b", INK_SECONDARY = "#52514e", INK_MUTED = "#898781", GRID = "#e1e0d9", BASELINE = "#c3c2b7", SURFACE = "#fcfcfb";
+const FULL_W = 656, HALF_W = 306;
+
+const ECR_LOGO_SVG = '<svg viewBox="0 0 300 76" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ECR Group"><rect x="0" y="4" width="26" height="26" rx="6" fill="#0072BC"/><rect x="32" y="4" width="26" height="26" rx="6" fill="#F7931E"/><rect x="0" y="36" width="26" height="26" rx="6" fill="#0072BC"/><rect x="32" y="36" width="26" height="26" rx="6" fill="#0072BC"/><text x="70" y="32" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="28" fill="#1B2A4A">ECR<tspan fill="#0072BC">GROUP</tspan></text><rect x="71" y="40" width="190" height="3" fill="#F7931E"/><text x="71" y="60" font-family="Arial,Helvetica,sans-serif" font-weight="600" font-style="italic" font-size="13" fill="#0072BC">Para que te dediques a tu negocio</text></svg>';
+
+function fmt(v, dec) {
+  dec = dec || 0;
+  if (v == null || isNaN(v)) v = 0;
+  const s = Number(v).toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  return dec === 0 ? s.replace(/,/g, ".") : s.replace(/,/g, "@").replace(/\./g, ",").replace(/@/g, ".");
+}
+function fmtClp(v) { return "$" + fmt(v); }
+function titleCase(s) { return String(s).toLowerCase().replace(/(^|\s|\/|-)([a-záéíóúñ])/gi, (m, sep, ch) => sep + ch.toUpperCase()); }
+function slugify(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); }
+function toDate(v) {
+  if (v == null || v === "") return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === "string") {
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) { const d = new Date(Date.UTC(+m[1], +m[2]-1, +m[3])); return isNaN(d) ? null : d; }
+  }
+  const d = new Date(v);
+  return isNaN(d) ? null : d;
+}
+function ymKey(d) { return d.getUTCFullYear() + "-" + String(d.getUTCMonth()+1).padStart(2,"0"); }
+function monthEndUTC(d) { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth()+1, 0)); }
+function yearsBetween(a, b) { return (a.getTime()-b.getTime())/(1000*60*60*24*365.25); }
+function num(v) { if (v == null || v === "") return 0; const n = Number(v); return isNaN(n) ? 0 : n; }
+
+function readRows(rows, headerRow) {
+  if (!rows.length) throw new Error("El archivo no tiene filas de datos.");
+  if (headerRow) {
+    const missing = HYD_ESSENTIAL.filter((c) => !headerRow.includes(c));
+    if (missing.length) throw new Error("Faltan columnas esenciales: " + missing.join(", ") + ". Verifica que este archivo sea un export HYD completo.");
+  }
+  return rows.filter((r) => r["Liquidación - Período"] != null && r["Liquidación - Período"] !== "");
+}
+
+function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
+  meta = meta || {};
+  const rows = readRows(rawRows, headerRow);
+  if (!rows.length) throw new Error("No se encontró ningún período válido en el archivo.");
+  const empresas = Array.from(new Set(rows.map((r) => r["Empresa - Nombre Empresa"]).filter(Boolean)));
+  const company = empresas[0] || "Cliente";
+  const periodos = rows.map((r) => toDate(r["Liquidación - Período"])).filter(Boolean);
+  const mesKeys = Array.from(new Set(periodos.map(ymKey)));
+  if (mesKeys.length > 1) throw new Error("Este archivo trae más de un período distinto (" + mesKeys.join(", ") + "). Sube un archivo por mes.");
+  const mes = mesKeys[0];
+  const [anio, mm] = mes.split("-");
+  const refDate = monthEndUTC(periodos[0]);
+  const dotacion = rows.length;
+
+  const tipoContratoCounts = {};
+  rows.forEach((r) => { const t = r["Trabajo - Tipo de Contrato"] || "Sin definir"; tipoContratoCounts[t] = (tipoContratoCounts[t]||0)+1; });
+
+  let antigSum = 0, antigN = 0;
+  rows.forEach((r) => { const fi = toDate(r["Trabajo - Fecha Ingreso Compañía"]); if (fi) { antigSum += yearsBetween(refDate, fi); antigN++; } });
+  const antiguedadPromAnios = antigN ? antigSum/antigN : 0;
+
+  let licenciaDiasTotal = 0, licenciaCasos = 0, ausenciaDiasTotal = 0;
+  rows.forEach((r) => {
+    const lic = num(r["Liquidación - Días Licencias (reales)"]);
+    const aus = num(r["Liquidación - Días Ausencias"]);
+    licenciaDiasTotal += lic; if (lic > 0) licenciaCasos++; ausenciaDiasTotal += aus;
+  });
+
+  let altas = 0;
+  rows.forEach((r) => { const fi = toDate(r["Trabajo - Fecha Ingreso Compañía"]); if (fi && ymKey(fi) === mes) altas++; });
+
+  let bajas = 0; const bajasMotivos = {};
+  rows.forEach((r) => {
+    const ft = r["Trabajo - Fecha Término Trabajo"];
+    if (ft != null && ft !== "") { bajas++; const mo = r["Trabajo - Razón de Término"]; if (mo) bajasMotivos[mo] = (bajasMotivos[mo]||0)+1; }
+  });
+
+  let salarioLiquidoSum = 0, salarioLiquidoCount = 0;
+  rows.forEach((r) => { const v = r["Liquidación - Sueldo Líquido"]; if (v != null && v !== "") { salarioLiquidoSum += num(v); salarioLiquidoCount++; } });
+
+  const hasCol = (col) => (headerRow ? headerRow.includes(col) : rows.length > 0 && col in rows[0]);
+
+  const hasAportes = hasCol("Aportes Patronales - Total Aportes Patronales");
+  let aportesPatronalesTotal = null;
+  if (hasAportes) aportesPatronalesTotal = rows.reduce((acc, r) => acc + num(r["Aportes Patronales - Total Aportes Patronales"]), 0);
+
+  const hasHaberes = hasCol("Liquidación - Total Haberes");
+  let haberesTotal = null;
+  if (hasHaberes) haberesTotal = rows.reduce((acc, r) => acc + num(r["Liquidación - Total Haberes"]), 0);
+
+  // Desglose de haberes: se suman todas las columnas de detalle que traen los
+  // prefijos "Haberes Imponibles - ..." y "Haberes No Imponibles - ..." (los
+  // conceptos varían por cliente/mes, por eso no se fija una lista cerrada) —
+  // EXCEPTO los conceptos que se anulan solos: "Depósito Convenido" aparece
+  // en el HYD a la vez como "Haberes No Imponibles - Depósito Convenido" Y
+  // como "Descuentos Otros - Depósito Convenido" por el mismo monto exacto
+  // (confirmado en abril-2026, rol privado: $72.216.360 en ambas columnas,
+  // neto $0 para el colaborador) — no le queda plata a nadie, así que no
+  // cuenta como un haber no imponible real (a pedido de Piera).
+  const HABERES_NO_IMPONIBLES_NETEADOS = ["deposito convenido"];
+  const colsImponibles = (headerRow || []).filter((c) => c && c.startsWith("Haberes Imponibles - "));
+  const colsNoImponibles = (headerRow || []).filter((c) => c && c.startsWith("Haberes No Imponibles - ")
+    && !HABERES_NO_IMPONIBLES_NETEADOS.includes(normAcc(c.slice("Haberes No Imponibles - ".length))));
+  const hasHaberesDesglose = colsImponibles.length > 0 || colsNoImponibles.length > 0;
+  let haberesImponiblesTotal = null, haberesNoImponiblesTotal = null;
+  if (hasHaberesDesglose) {
+    haberesImponiblesTotal = rows.reduce((acc, r) => acc + colsImponibles.reduce((s, c) => s + num(r[c]), 0), 0);
+    haberesNoImponiblesTotal = rows.reduce((acc, r) => acc + colsNoImponibles.reduce((s, c) => s + num(r[c]), 0), 0);
+  }
+
+  const hasImpuestoUnico = hasCol("Descuentos Legales - Impuesto Único");
+  let impuestoUnicoTotal = null;
+  if (hasImpuestoUnico) impuestoUnicoTotal = rows.reduce((acc, r) => acc + num(r["Descuentos Legales - Impuesto Único"]), 0);
+
+  // Costo empresa = Total Haberes (bruto: imponible + no imponible) + Aportes Patronales
+  // (SIS, mutual, cesantía empleador, etc.) — se calcula por colaborador y se agrupa por área.
+  const hasCostoEmpresa = hasHaberes && hasAportes;
+
+  let areaCounts = null, areaCostoEmpresa = null;
+  if (hasCol("Trabajo - Centro de Costo")) {
+    areaCounts = {};
+    if (hasCostoEmpresa) areaCostoEmpresa = {};
+    rows.forEach((r) => {
+      let cc = r["Trabajo - Centro de Costo"]; if (cc == null || cc === "") cc = "Sin definir"; if (cc === "NO DEFINIDO") cc = "Sin definir";
+      areaCounts[cc] = (areaCounts[cc]||0)+1;
+      if (hasCostoEmpresa) {
+        const costo = num(r["Liquidación - Total Haberes"]) + num(r["Aportes Patronales - Total Aportes Patronales"]);
+        areaCostoEmpresa[cc] = (areaCostoEmpresa[cc]||0) + costo;
+      }
+    });
+  }
+
+  let nIgualImm = 0, nEntre = 0, nSobre = 0;
+  rows.forEach((r) => { const sb = num(r["Trabajo - Sueldo Base"]); if (sb <= imm) nIgualImm++; else if (sb < tramoUmbral) nEntre++; else nSobre++; });
+
+  return {
+    cliente: company, clienteSlug: slugify(company), mes, mesLabel: MESES_ES[mm], anio,
+    dotacion, tipoContratoCounts, antiguedadPromAnios,
+    licenciaDiasTotal, licenciaCasos, ausenciaDiasTotal,
+    altas, bajas, bajasMotivos,
+    salarioLiquidoSum, salarioLiquidoCount, aportesPatronalesTotal, areaCounts,
+    haberesTotal, haberesImponiblesTotal, haberesNoImponiblesTotal, impuestoUnicoTotal, areaCostoEmpresa,
+    tramo: { imm, tramoUmbral, nIgualImm, nEntre, nSobre },
+    sourceFile: meta.sourceFile || null, uploadedBy: meta.uploadedBy || null, uploadedAt: meta.uploadedAt || null,
+  };
+}
+
+function combineAggregates(list) {
+  if (!list.length) throw new Error("No hay meses para combinar.");
+  const sorted = list.slice().sort((a,b) => (a.mes<b.mes?-1:a.mes>b.mes?1:0));
+  const mesesArr = sorted.map((a)=>a.mes), mesLabels = sorted.map((a)=>a.mesLabel);
+  const first = sorted[0], cutoff = sorted[sorted.length-1];
+  const companyCounts = {}; sorted.forEach((a)=>{companyCounts[a.cliente]=(companyCounts[a.cliente]||0)+1;});
+  const company = Object.keys(companyCounts).sort((x,y)=>companyCounts[y]-companyCounts[x])[0];
+  const anioCutoff = cutoff.anio;
+  const periodoLabel = (first.mes.slice(0,4)===cutoff.mes.slice(0,4)) ? `${first.mesLabel}–${cutoff.mesLabel} ${anioCutoff}` : `${first.mesLabel} ${first.mes.slice(0,4)}–${cutoff.mesLabel} ${anioCutoff}`;
+  const dotCutoff = cutoff.dotacion, dotFirst = first.dotacion;
+  const deltaDot = dotCutoff - dotFirst;
+  const deltaPct = dotFirst ? (deltaDot/dotFirst)*100 : 0;
+  const pctIndef = dotCutoff ? ((cutoff.tipoContratoCounts["Indefinido"]||0)/dotCutoff)*100 : 0;
+  const antigProm = cutoff.antiguedadPromAnios;
+  const licTotal = sorted.reduce((s,a)=>s+a.licenciaDiasTotal,0);
+  const licCasos = sorted.reduce((s,a)=>s+a.licenciaCasos,0);
+  const ausTotal = sorted.reduce((s,a)=>s+a.ausenciaDiasTotal,0);
+  const altasTotal = sorted.reduce((s,a)=>s+a.altas,0);
+  const bajasTotal = sorted.reduce((s,a)=>s+a.bajas,0);
+  const bajasMotivos = {}; sorted.forEach((a)=>Object.entries(a.bajasMotivos||{}).forEach(([k,v])=>{bajasMotivos[k]=(bajasMotivos[k]||0)+v;}));
+  const aportesMesesOk = sorted.filter((a)=>a.aportesPatronalesTotal!=null);
+  const aportesMesesExcluidos = sorted.filter((a)=>a.aportesPatronalesTotal==null).map((a)=>a.mes);
+  const totalAportesPeriodo = aportesMesesOk.length ? aportesMesesOk.reduce((s,a)=>s+a.aportesPatronalesTotal,0) : null;
+  const haberesMesesOk = sorted.filter((a)=>a.haberesTotal!=null);
+  const haberesMesesExcluidos = sorted.filter((a)=>a.haberesTotal==null).map((a)=>a.mes);
+  const totalHaberesPeriodo = haberesMesesOk.length ? haberesMesesOk.reduce((s,a)=>s+a.haberesTotal,0) : null;
+  const haberesImpMesesOk = sorted.filter((a)=>a.haberesImponiblesTotal!=null);
+  const totalHaberesImponiblesPeriodo = haberesImpMesesOk.length ? haberesImpMesesOk.reduce((s,a)=>s+a.haberesImponiblesTotal,0) : null;
+  const haberesNoImpMesesOk = sorted.filter((a)=>a.haberesNoImponiblesTotal!=null);
+  const totalHaberesNoImponiblesPeriodo = haberesNoImpMesesOk.length ? haberesNoImpMesesOk.reduce((s,a)=>s+a.haberesNoImponiblesTotal,0) : null;
+  const impuestoMesesOk = sorted.filter((a)=>a.impuestoUnicoTotal!=null);
+  const impuestoMesesExcluidos = sorted.filter((a)=>a.impuestoUnicoTotal==null).map((a)=>a.mes);
+  const totalImpuestoUnicoPeriodo = impuestoMesesOk.length ? impuestoMesesOk.reduce((s,a)=>s+a.impuestoUnicoTotal,0) : null;
+  const dotValues = sorted.map((a)=>a.dotacion);
+  const tiposContrato = Array.from(new Set(sorted.flatMap((a)=>Object.keys(a.tipoContratoCounts))));
+  tiposContrato.sort((x,y)=> (x==="Indefinido"?-1:y==="Indefinido"?1:(x<y?-1:x>y?1:0)));
+  const paletteCycle = [PALETTE.blue, PALETTE.orange, PALETTE.aqua, PALETTE.yellow];
+  const contratoColors = tiposContrato.map((_,i)=>paletteCycle[i%paletteCycle.length]);
+  const contratoSeries = {}; tiposContrato.forEach((t)=>{contratoSeries[t]=sorted.map((a)=>a.tipoContratoCounts[t]||0);});
+  const licPorMes = sorted.map((a)=>a.licenciaDiasTotal), ausPorMes = sorted.map((a)=>a.ausenciaDiasTotal);
+  const licCasosPorMes = sorted.map((a)=>a.licenciaCasos);
+  let areasItems = null, areasCostoItems = null;
+  if (cutoff.areaCounts) {
+    const entries = Object.entries(cutoff.areaCounts).sort((a,b)=>b[1]-a[1]);
+    const top = entries.slice(0,8); const otherSum = entries.slice(8).reduce((s,[,v])=>s+v,0);
+    areasItems = top.map(([k,v])=>[titleCase(k),v]); if (otherSum>0) areasItems.push(["Otras áreas", otherSum]);
+    if (cutoff.areaCostoEmpresa) {
+      const otherCosto = entries.slice(8).reduce((s,[k])=>s+(cutoff.areaCostoEmpresa[k]||0),0);
+      areasCostoItems = top.map(([k])=>Math.round((cutoff.areaCostoEmpresa[k]||0)/1e6));
+      if (otherSum>0) areasCostoItems.push(Math.round(otherCosto/1e6));
+    }
+  }
+  const tramoItems = [["Igual al IMM", cutoff.tramo.nIgualImm], [`IMM – $${fmt(cutoff.tramo.tramoUmbral)}`, cutoff.tramo.nEntre], [`Sobre $${fmt(cutoff.tramo.tramoUmbral)}`, cutoff.tramo.nSobre]];
+  const apMmVals = aportesMesesOk.length ? sorted.map((a)=>Math.round((a.aportesPatronalesTotal||0)/1e6)) : null;
+  const haberesMmVals = haberesMesesOk.length ? sorted.map((a)=>Math.round((a.haberesTotal||0)/1e6)) : null;
+  return {
+    company_name: company, meses: mesesArr, mes_labels: mesLabels,
+    mes_cutoff_label: cutoff.mesLabel, anio_cutoff: anioCutoff, periodo_label: periodoLabel,
+    dot_cutoff: dotCutoff, dot_first: dotFirst, delta_dot: deltaDot, delta_pct: deltaPct,
+    pct_indef: pctIndef, antig_prom: antigProm,
+    lic_total: licTotal, lic_casos: licCasos, aus_total: ausTotal,
+    altas_total: altasTotal, bajas_total: bajasTotal,
+    bajas_motivos: Object.entries(bajasMotivos).sort((a,b)=>b[1]-a[1]),
+    total_aportes_periodo: totalAportesPeriodo, aportes_meses_excluidos: aportesMesesExcluidos,
+    total_haberes_periodo: totalHaberesPeriodo, haberes_meses_excluidos: haberesMesesExcluidos,
+    total_haberes_imponibles_periodo: totalHaberesImponiblesPeriodo,
+    total_haberes_no_imponibles_periodo: totalHaberesNoImponiblesPeriodo,
+    total_impuesto_unico_periodo: totalImpuestoUnicoPeriodo, impuesto_meses_excluidos: impuestoMesesExcluidos,
+    bono_ajustes: sorted.filter((a) => a.bonoAjuste).map((a) => ({ mesLabel: a.mesLabel, anio: a.anio, ...a.bonoAjuste })),
+    n_igual_imm: cutoff.tramo.nIgualImm, n_entre: cutoff.tramo.nEntre, n_sobre: cutoff.tramo.nSobre,
+    imm: cutoff.tramo.imm, tramo_umbral: cutoff.tramo.tramoUmbral,
+    tipos_contrato: tiposContrato, contrato_colors: contratoColors,
+    _dotValues: dotValues, _mesLabels: mesLabels, _contratoSeries: contratoSeries, _contratoColors: contratoColors,
+    _licPorMes: licPorMes, _ausPorMes: ausPorMes, _licCasosPorMes: licCasosPorMes,
+    _areasItems: areasItems, _areasCostoItems: areasCostoItems, _tramoItems: tramoItems,
+    _apMmVals: apMmVals, _haberesMmVals: haberesMmVals,
+  };
+}
+
+function esc2(s) { return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function lineChart(values, labels, opts) {
+  opts = opts||{};
+  const width=opts.width||680, height=opts.height||220, color=opts.color||PALETTE.blue, unit=opts.unit||"";
+  const padL=opts.padL!=null?opts.padL:36, padR=opts.padR!=null?opts.padR:16, padT=opts.padT!=null?opts.padT:24, padB=opts.padB!=null?opts.padB:32;
+  const n=values.length;
+  const vmax=opts.yMax!=null?opts.yMax:(Math.max(...values)>0?Math.max(...values)*1.25:1);
+  const vmin=opts.yMin!=null?opts.yMin:0;
+  const vmaxF=vmax===vmin?vmin+1:vmax;
+  const plotW=width-padL-padR, plotH=height-padT-padB;
+  const x=(i)=>padL+(n>1?(plotW*i)/(n-1):plotW/2);
+  const y=(v)=>padT+plotH-((v-vmin)/(vmaxF-vmin))*plotH;
+  let svg=[`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`];
+  for (let g=0; g<=4; g++) {
+    const gy=padT+(plotH*g)/4, gv=vmaxF-((vmaxF-vmin)*g)/4;
+    svg.push(`<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${width-padR}" y2="${gy.toFixed(1)}" stroke="${GRID}" stroke-width="1"/>`);
+    svg.push(`<text x="${padL-8}" y="${(gy+4).toFixed(1)}" font-size="10.5" fill="${INK_MUTED}" text-anchor="end" font-family="system-ui,sans-serif">${fmt(gv)}</text>`);
+  }
+  svg.push(`<line x1="${padL}" y1="${padT+plotH}" x2="${width-padR}" y2="${padT+plotH}" stroke="${BASELINE}" stroke-width="1"/>`);
+  const pts=values.map((v,i)=>[x(i),y(v)]);
+  const areaPts=pts.map(([px,py])=>`${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
+  svg.push(`<path d="M${padL.toFixed(1)},${(padT+plotH).toFixed(1)} L${areaPts} L${(padL+plotW).toFixed(1)},${(padT+plotH).toFixed(1)} Z" fill="${color}" opacity="0.08"/>`);
+  svg.push(`<path d="M${pts.map(([px,py])=>`${px.toFixed(1)},${py.toFixed(1)}`).join(" L")}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`);
+  pts.forEach(([px,py],i)=>{
+    svg.push(`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4" fill="${SURFACE}" stroke="${color}" stroke-width="2.5"/>`);
+    const lblY = py-10>padT+8 ? py-10 : py+18;
+    svg.push(`<text x="${px.toFixed(1)}" y="${lblY.toFixed(1)}" font-size="11.5" font-weight="600" fill="${INK_PRIMARY}" text-anchor="middle" font-family="system-ui,sans-serif">${fmt(values[i])}${unit}</text>`);
+    svg.push(`<text x="${px.toFixed(1)}" y="${padT+plotH+18}" font-size="10.5" fill="${INK_SECONDARY}" text-anchor="middle" font-family="system-ui,sans-serif">${esc2(labels[i])}</text>`);
+  });
+  svg.push("</svg>"); return svg.join("\n");
+}
+
+function hbarChart(items, opts) {
+  opts=opts||{};
+  const width=opts.width||680, rowH=opts.rowH||26, gap=opts.gap!=null?opts.gap:10;
+  const padL=opts.padL!=null?opts.padL:8, padR=opts.padR!=null?opts.padR:64, padT=opts.padT!=null?opts.padT:6, padB=opts.padB!=null?opts.padB:6;
+  const color=opts.color||PALETTE.blue, unit=opts.unit||"", labelW=opts.labelW!=null?opts.labelW:170;
+  const n=items.length; const height=padT+padB+n*rowH+(n-1)*gap;
+  let vmax=opts.maxVal||(items.length?Math.max(...items.map(([,v])=>v))*1.12:1); if (vmax===0) vmax=1;
+  const barX0=padL+labelW, barMaxW=width-barX0-padR;
+  let svg=[`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`];
+  items.forEach(([lbl,val],i)=>{
+    const ry=padT+i*(rowH+gap); const bw=Math.max((barMaxW*val)/vmax,2); const cy=ry+rowH/2;
+    svg.push(`<text x="${padL+labelW-10}" y="${(cy+4).toFixed(1)}" font-size="11.5" fill="${INK_SECONDARY}" text-anchor="end" font-family="system-ui,sans-serif">${esc2(lbl)}</text>`);
+    svg.push(`<rect x="${barX0}" y="${ry}" width="${barMaxW}" height="${rowH}" rx="4" fill="${GRID}" opacity="0.5"/>`);
+    svg.push(`<rect x="${barX0}" y="${ry}" width="${bw.toFixed(1)}" height="${rowH}" rx="4" fill="${color}"/>`);
+    svg.push(`<text x="${(barX0+bw+8).toFixed(1)}" y="${(cy+4).toFixed(1)}" font-size="11.5" font-weight="600" fill="${INK_PRIMARY}" font-family="system-ui,sans-serif">${fmt(val)}${unit}</text>`);
+  });
+  svg.push("</svg>"); return { svg: svg.join("\n"), height };
+}
+
+function stackedVbarChart(categories, series, colors, opts) {
+  opts=opts||{};
+  const width=opts.width||680, height=opts.height||230, unit=opts.unit||"";
+  const padL=opts.padL!=null?opts.padL:36, padR=opts.padR!=null?opts.padR:16, padT=opts.padT!=null?opts.padT:24, padB=opts.padB!=null?opts.padB:44;
+  const n=categories.length; const names=Object.keys(series);
+  const totals=categories.map((_,i)=>names.reduce((s,nm)=>s+series[nm][i],0));
+  const vmax=totals.length&&Math.max(...totals)>0?Math.max(...totals)*1.2:1;
+  const plotW=width-padL-padR, plotH=height-padT-padB;
+  const barW=(plotW/n)*0.52, gap=plotW/n;
+  const y=(v)=>padT+plotH-(v/vmax)*plotH;
+  let svg=[`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`];
+  for (let g=0; g<=4; g++) {
+    const gy=padT+(plotH*g)/4, gv=vmax-(vmax*g)/4;
+    svg.push(`<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${width-padR}" y2="${gy.toFixed(1)}" stroke="${GRID}" stroke-width="1"/>`);
+    svg.push(`<text x="${padL-8}" y="${(gy+4).toFixed(1)}" font-size="10.5" fill="${INK_MUTED}" text-anchor="end" font-family="system-ui,sans-serif">${fmt(gv)}</text>`);
+  }
+  svg.push(`<line x1="${padL}" y1="${padT+plotH}" x2="${width-padR}" y2="${padT+plotH}" stroke="${BASELINE}" stroke-width="1"/>`);
+  categories.forEach((cat,i)=>{
+    const cx=padL+gap*i+gap/2, bx=cx-barW/2; let cum=0;
+    names.forEach((nm,si)=>{
+      const v=series[nm][i]; if (v<=0) return;
+      const y0=y(cum), y1=y(cum+v), h=y0-y1, gapOffset=si>0?1:0;
+      svg.push(`<rect x="${bx.toFixed(1)}" y="${(y1+gapOffset).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(h-gapOffset,1).toFixed(1)}" rx="3" fill="${colors[si]}"/>`);
+      cum+=v;
+    });
+    svg.push(`<text x="${cx.toFixed(1)}" y="${(y(cum)-8).toFixed(1)}" font-size="11" font-weight="600" fill="${INK_PRIMARY}" text-anchor="middle" font-family="system-ui,sans-serif">${fmt(cum)}${unit}</text>`);
+    svg.push(`<text x="${cx.toFixed(1)}" y="${padT+plotH+18}" font-size="10.5" fill="${INK_SECONDARY}" text-anchor="middle" font-family="system-ui,sans-serif">${esc2(cat)}</text>`);
+  });
+  svg.push("</svg>"); return svg.join("\n");
+}
+
+function barChartVertical(labels, values, opts) {
+  opts=opts||{};
+  const width=opts.width||680, height=opts.height||220, color=opts.color||PALETTE.blue, unit=opts.unit||"";
+  const padL=opts.padL!=null?opts.padL:36, padR=opts.padR!=null?opts.padR:16, padT=opts.padT!=null?opts.padT:24, padB=opts.padB!=null?opts.padB:32;
+  const n=labels.length;
+  const vmax=values.length&&Math.max(...values)>0?Math.max(...values)*1.25:1;
+  const plotW=width-padL-padR, plotH=height-padT-padB;
+  const barW=(plotW/n)*0.5, gap=plotW/n;
+  const y=(v)=>padT+plotH-(v/vmax)*plotH;
+  let svg=[`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`];
+  for (let g=0; g<=4; g++) {
+    const gy=padT+(plotH*g)/4, gv=vmax-(vmax*g)/4;
+    svg.push(`<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${width-padR}" y2="${gy.toFixed(1)}" stroke="${GRID}" stroke-width="1"/>`);
+    svg.push(`<text x="${padL-8}" y="${(gy+4).toFixed(1)}" font-size="10.5" fill="${INK_MUTED}" text-anchor="end" font-family="system-ui,sans-serif">${fmt(gv)}</text>`);
+  }
+  svg.push(`<line x1="${padL}" y1="${padT+plotH}" x2="${width-padR}" y2="${padT+plotH}" stroke="${BASELINE}" stroke-width="1"/>`);
+  labels.forEach((lbl,i)=>{
+    const cx=padL+gap*i+gap/2, bx=cx-barW/2, v=values[i], by=y(v), h=padT+plotH-by;
+    if (v>0) svg.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(h,2).toFixed(1)}" rx="4" fill="${color}"/>`);
+    const labelY = v>0 ? by-8 : padT+plotH-8;
+    svg.push(`<text x="${cx.toFixed(1)}" y="${labelY.toFixed(1)}" font-size="11" font-weight="600" fill="${INK_PRIMARY}" text-anchor="middle" font-family="system-ui,sans-serif">${fmt(v)}${unit}</text>`);
+    svg.push(`<text x="${cx.toFixed(1)}" y="${padT+plotH+18}" font-size="10.5" fill="${INK_SECONDARY}" text-anchor="middle" font-family="system-ui,sans-serif">${esc2(lbl)}</text>`);
+  });
+  svg.push("</svg>"); return svg.join("\n");
+}
+
+// Barras apiladas (p.ej. composición por tipo de contrato) + línea de un total
+// sobre el mismo eje (usado para "Evolución de la dotación" combinado con
+// "Dotación por tipo de contrato": la línea coincide con el techo de las
+// barras, pero conecta los meses para que el crecimiento se lea de un vistazo).
+function stackedVbarLineChart(categories, series, colors, lineValues, opts) {
+  opts=opts||{};
+  const width=opts.width||680, height=opts.height||230;
+  const padL=opts.padL!=null?opts.padL:36, padR=opts.padR!=null?opts.padR:16, padT=opts.padT!=null?opts.padT:28, padB=opts.padB!=null?opts.padB:44;
+  const n=categories.length; const names=Object.keys(series);
+  const totals=categories.map((_,i)=>names.reduce((s,nm)=>s+series[nm][i],0));
+  const vmax=Math.max(...totals,...lineValues,1)*1.22;
+  const plotW=width-padL-padR, plotH=height-padT-padB;
+  const barW=(plotW/n)*0.52, gap=plotW/n;
+  const xC=(i)=>padL+gap*i+gap/2;
+  const y=(v)=>padT+plotH-(v/vmax)*plotH;
+  const lineColor=opts.lineColor||PALETTE.navy;
+  let svg=[`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`];
+  for (let g=0; g<=4; g++) {
+    const gy=padT+(plotH*g)/4, gv=vmax-(vmax*g)/4;
+    svg.push(`<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${width-padR}" y2="${gy.toFixed(1)}" stroke="${GRID}" stroke-width="1"/>`);
+    svg.push(`<text x="${padL-8}" y="${(gy+4).toFixed(1)}" font-size="10.5" fill="${INK_MUTED}" text-anchor="end" font-family="system-ui,sans-serif">${fmt(gv)}</text>`);
+  }
+  svg.push(`<line x1="${padL}" y1="${padT+plotH}" x2="${width-padR}" y2="${padT+plotH}" stroke="${BASELINE}" stroke-width="1"/>`);
+  categories.forEach((cat,i)=>{
+    const cx=xC(i), bx=cx-barW/2; let cum=0;
+    names.forEach((nm,si)=>{
+      const v=series[nm][i]; if (v<=0) return;
+      const y0=y(cum), y1=y(cum+v), h=y0-y1, gapOffset=si>0?1:0;
+      svg.push(`<rect x="${bx.toFixed(1)}" y="${(y1+gapOffset).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(h-gapOffset,1).toFixed(1)}" rx="3" fill="${colors[si]}"/>`);
+      cum+=v;
+    });
+    svg.push(`<text x="${cx.toFixed(1)}" y="${padT+plotH+18}" font-size="10.5" fill="${INK_SECONDARY}" text-anchor="middle" font-family="system-ui,sans-serif">${esc2(cat)}</text>`);
+  });
+  const pts=lineValues.map((v,i)=>[xC(i), y(v)]);
+  svg.push(`<path d="M${pts.map(([px,py])=>`${px.toFixed(1)},${py.toFixed(1)}`).join(" L")}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`);
+  pts.forEach(([px,py],i)=>{
+    svg.push(`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4" fill="${SURFACE}" stroke="${lineColor}" stroke-width="2.5"/>`);
+    const lblY = py-10>padT+8 ? py-10 : py+16;
+    svg.push(`<text x="${px.toFixed(1)}" y="${lblY.toFixed(1)}" font-size="11.5" font-weight="700" fill="${lineColor}" text-anchor="middle" font-family="system-ui,sans-serif">${fmt(lineValues[i])}</text>`);
+  });
+  svg.push("</svg>"); return svg.join("\n");
+}
+
+// Barras apiladas (días de licencia / ausencia, eje izquierdo) + línea de
+// cantidad de colaboradores con licencia (eje derecho, escala distinta —
+// pocos colaboradores pueden acumular muchos días).
+function stackedVbarDualLineChart(categories, series, colors, lineValues, opts) {
+  opts=opts||{};
+  const width=opts.width||680, height=opts.height||230;
+  const padL=opts.padL!=null?opts.padL:36, padR=opts.padR!=null?opts.padR:52, padT=opts.padT!=null?opts.padT:30, padB=opts.padB!=null?opts.padB:44;
+  const n=categories.length; const names=Object.keys(series);
+  const totals=categories.map((_,i)=>names.reduce((s,nm)=>s+series[nm][i],0));
+  const vmaxL=Math.max(...totals,1)*1.25;
+  const vmaxR=Math.max(...lineValues,1)*1.25;
+  const plotW=width-padL-padR, plotH=height-padT-padB;
+  const barW=(plotW/n)*0.5, gap=plotW/n;
+  const xC=(i)=>padL+gap*i+gap/2;
+  const yL=(v)=>padT+plotH-(v/vmaxL)*plotH;
+  const yR=(v)=>padT+plotH-(v/vmaxR)*plotH;
+  const lineColor=opts.lineColor||PALETTE.navy;
+  let svg=[`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`];
+  svg.push(`<text x="${padL}" y="${(padT-12).toFixed(1)}" font-size="9.5" fill="${INK_MUTED}" text-anchor="start" font-family="system-ui,sans-serif">Días</text>`);
+  svg.push(`<text x="${width-padR}" y="${(padT-12).toFixed(1)}" font-size="9.5" fill="${lineColor}" text-anchor="end" font-family="system-ui,sans-serif">Colaboradores con licencia</text>`);
+  for (let g=0; g<=4; g++) {
+    const gy=padT+(plotH*g)/4, gvL=vmaxL-(vmaxL*g)/4, gvR=vmaxR-(vmaxR*g)/4;
+    svg.push(`<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${width-padR}" y2="${gy.toFixed(1)}" stroke="${GRID}" stroke-width="1"/>`);
+    svg.push(`<text x="${padL-8}" y="${(gy+4).toFixed(1)}" font-size="10" fill="${INK_MUTED}" text-anchor="end" font-family="system-ui,sans-serif">${fmt(gvL)}</text>`);
+    svg.push(`<text x="${width-padR+8}" y="${(gy+4).toFixed(1)}" font-size="10" fill="${lineColor}" text-anchor="start" font-family="system-ui,sans-serif">${fmt(gvR)}</text>`);
+  }
+  svg.push(`<line x1="${padL}" y1="${padT+plotH}" x2="${width-padR}" y2="${padT+plotH}" stroke="${BASELINE}" stroke-width="1"/>`);
+  const barLabelYs = new Array(n).fill(null);
+  categories.forEach((cat,i)=>{
+    const cx=xC(i), bx=cx-barW/2; let cum=0;
+    names.forEach((nm,si)=>{
+      const v=series[nm][i]; if (v<=0) return;
+      const y0=yL(cum), y1=yL(cum+v), h=y0-y1, gapOffset=si>0?1:0;
+      svg.push(`<rect x="${bx.toFixed(1)}" y="${(y1+gapOffset).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(h-gapOffset,1).toFixed(1)}" rx="3" fill="${colors[si]}"/>`);
+      cum+=v;
+    });
+    if (cum>0) { const barLblY = yL(cum)-8; barLabelYs[i] = barLblY; svg.push(`<text x="${cx.toFixed(1)}" y="${barLblY.toFixed(1)}" font-size="10.5" font-weight="600" fill="${INK_PRIMARY}" text-anchor="middle" font-family="system-ui,sans-serif">${fmt(cum)} d</text>`); }
+    svg.push(`<text x="${cx.toFixed(1)}" y="${padT+plotH+18}" font-size="10.5" fill="${INK_SECONDARY}" text-anchor="middle" font-family="system-ui,sans-serif">${esc2(cat)}</text>`);
+  });
+  const pts=lineValues.map((v,i)=>[xC(i), yR(v)]);
+  svg.push(`<path d="M${pts.map(([px,py])=>`${px.toFixed(1)},${py.toFixed(1)}`).join(" L")}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`);
+  pts.forEach(([px,py],i)=>{
+    svg.push(`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4" fill="${SURFACE}" stroke="${lineColor}" stroke-width="2.5"/>`);
+    // El label del punto puede caer muy cerca del label de días de la barra
+    // (ej. cuando ambos valores están cerca del máximo de su propio eje) —
+    // si eso pasa, se empuja el label del punto lejos del label de la barra
+    // en vez de simplemente arriba/abajo del punto, para que no se encimen.
+    const above = py-10, below = py+16;
+    let lblY = above>padT+8 ? above : below;
+    const barLblY = barLabelYs[i];
+    if (barLblY != null && Math.abs(lblY-barLblY) < 13) {
+      lblY = Math.abs(above-barLblY) >= Math.abs(below-barLblY) && above>padT+8 ? above : below;
+      if (Math.abs(lblY-barLblY) < 13) lblY = below + 14;
+    }
+    svg.push(`<text x="${px.toFixed(1)}" y="${lblY.toFixed(1)}" font-size="11" font-weight="700" fill="${lineColor}" text-anchor="middle" font-family="system-ui,sans-serif">${fmt(lineValues[i])} pers.</text>`);
+  });
+  svg.push("</svg>"); return svg.join("\n");
+}
+
+// Barras horizontales pareadas por área: dotación (azul) y costo empresa en
+// $MM (naranja) — costoItems puede venir null si el HYD no trae los datos
+// necesarios para calcular costo empresa, en cuyo caso solo se dibuja dotación.
+function hbarComboChart(items, costoItems, opts) {
+  opts=opts||{};
+  const width=opts.width||680;
+  const rowH=opts.rowH||34, gap=opts.gap!=null?opts.gap:14, barH=opts.barH||13, barGap=opts.barGap||3;
+  const padL=opts.padL!=null?opts.padL:8, padR=opts.padR!=null?opts.padR:8, padT=opts.padT!=null?opts.padT:22, padB=opts.padB!=null?opts.padB:6;
+  const labelW=opts.labelW!=null?opts.labelW:195;
+  const colorHead=opts.colorHead||PALETTE.blue, colorCosto=opts.colorCosto||PALETTE.orange;
+  const n=items.length; const height=padT+padB+n*rowH+Math.max(n-1,0)*gap;
+  const vmaxHead=Math.max(...items.map(([,v])=>v),1)*1.15;
+  const hasCosto=costoItems!=null;
+  const vmaxCosto=hasCosto?Math.max(...costoItems,1)*1.15:1;
+  const barX0=padL+labelW, barMaxW=width-barX0-padR;
+  let svg=[`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`];
+  svg.push(`<text x="${barX0}" y="${(padT-8).toFixed(1)}" font-size="9.5" font-weight="600" fill="${colorHead}" text-anchor="start" font-family="system-ui,sans-serif">&#9632; Dotación</text>`);
+  if (hasCosto) svg.push(`<text x="${(barX0+100).toFixed(1)}" y="${(padT-8).toFixed(1)}" font-size="9.5" font-weight="600" fill="${colorCosto}" text-anchor="start" font-family="system-ui,sans-serif">&#9632; Costo empresa ($ MM)</text>`);
+  items.forEach(([lbl,val],i)=>{
+    const ry=padT+i*(rowH+gap);
+    const labelCy = hasCosto ? ry+(barH*2+barGap)/2 : ry+barH/2;
+    svg.push(`<text x="${(padL+labelW-10).toFixed(1)}" y="${(labelCy+4).toFixed(1)}" font-size="11" fill="${INK_SECONDARY}" text-anchor="end" font-family="system-ui,sans-serif">${esc2(lbl)}</text>`);
+    const bw1=Math.max((barMaxW*val)/vmaxHead,2);
+    svg.push(`<rect x="${barX0}" y="${ry}" width="${barMaxW}" height="${barH}" rx="3" fill="${GRID}" opacity="0.5"/>`);
+    svg.push(`<rect x="${barX0}" y="${ry}" width="${bw1.toFixed(1)}" height="${barH}" rx="3" fill="${colorHead}"/>`);
+    svg.push(`<text x="${(barX0+bw1+8).toFixed(1)}" y="${(ry+barH/2+4).toFixed(1)}" font-size="10.5" font-weight="600" fill="${INK_PRIMARY}" font-family="system-ui,sans-serif">${fmt(val)}</text>`);
+    if (hasCosto) {
+      const costoV=costoItems[i]||0, ry2=ry+barH+barGap;
+      const bw2=Math.max((barMaxW*costoV)/vmaxCosto,2);
+      svg.push(`<rect x="${barX0}" y="${ry2}" width="${barMaxW}" height="${barH}" rx="3" fill="${GRID}" opacity="0.5"/>`);
+      svg.push(`<rect x="${barX0}" y="${ry2}" width="${bw2.toFixed(1)}" height="${barH}" rx="3" fill="${colorCosto}"/>`);
+      svg.push(`<text x="${(barX0+bw2+8).toFixed(1)}" y="${(ry2+barH/2+4).toFixed(1)}" font-size="10.5" font-weight="600" fill="${INK_PRIMARY}" font-family="system-ui,sans-serif">$${fmt(costoV)} MM</text>`);
+    }
+  });
+  svg.push("</svg>"); return { svg: svg.join("\n"), height };
+}
+
+function deltaBadge(delta, pct, positiveIsGood) {
+  if (positiveIsGood==null) positiveIsGood=true;
+  const sign = delta>=0?"+":""; const cls=(delta>=0)===positiveIsGood?"good":"bad";
+  const arrow = delta>0?"&#9650;":delta<0?"&#9660;":"&#9679;";
+  return `<span class="delta ${cls}">${arrow} ${sign}${fmt(delta)} (${sign}${fmt(pct,1)}%)</span>`;
+}
+
+function buildCharts(d) {
+  d.chart_dotacion_contrato = stackedVbarLineChart(d._mesLabels, d._contratoSeries, d._contratoColors, d._dotValues, { width: FULL_W, height: 200, lineColor: PALETTE.navy });
+  d.chart_licencias = stackedVbarDualLineChart(d._mesLabels, { "Licencia médica": d._licPorMes, "Ausencia": d._ausPorMes }, [PALETTE.aqua, PALETTE.yellow], d._licCasosPorMes, { width: FULL_W, height: 210, lineColor: PALETTE.navy });
+  d.chart_areas = d._areasItems ? hbarComboChart(d._areasItems, d._areasCostoItems, { width: FULL_W, labelW: 195 }).svg : null;
+  d.chart_tramo = hbarChart(d._tramoItems, { width: HALF_W, rowH: 26, gap: 12, padL: 4, padR: 30, color: PALETTE.blue, labelW: 112 }).svg;
+  d.chart_haberes_mes = d._haberesMmVals ? barChartVertical(d._mesLabels, d._haberesMmVals, { width: HALF_W, height: 196, color: PALETTE.blue, padL: 26, padR: 8 }) : null;
+  d.chart_aportes_mes = d._apMmVals ? barChartVertical(d._mesLabels, d._apMmVals, { width: HALF_W, height: 196, color: PALETTE.orange, padL: 26, padR: 8 }) : null;
+  return d;
+}
+
+function renderDashboardHTML(pieces, logoSvg) {
+  const d = buildCharts(Object.assign({}, pieces));
+  const company = d.company_name, periodo = d.periodo_label;
+  const corte = `${d.mes_cutoff_label}-${String(d.anio_cutoff).slice(-2)}`;
+  const logoTag = `<span class="ecr-logo">${logoSvg}</span>`;
+  const legendItems = d.tipos_contrato.map((t,i)=>`<span><span class="dot" style="background:${d.contrato_colors[i]}"></span>${esc2(t)}</span>`).join("");
+  let areasSection = "";
+  if (d.chart_areas) areasSection = `
+  <div class="section">
+    <div class="section-title">Dotación por área / centro de costo</div>
+    <div class="section-sub">Cantidad de colaboradores${d._areasCostoItems ? " y costo empresa ($ MM, bruto + aportes patronales)" : ""} por área &middot; ${corte}</div>
+    <div class="card">${d.chart_areas}</div>
+  </div>`;
+  let finiquitoDesc;
+  if (d.bajas_total && d.bajas_motivos.length) {
+    finiquitoDesc = `Motivos registrados en el HYD: ${d.bajas_motivos.map(([m,n])=>`${esc2(m)} (${n})`).join(", ")}.`;
+  } else if (d.bajas_total) {
+    finiquitoDesc = "Se registraron desvinculaciones en el período, pero el HYD no trae el motivo asociado para este cliente.";
+  } else {
+    finiquitoDesc = "No se registraron desvinculaciones ni finiquitos en el período informado. Este indicador se calcula a partir de la fecha de término de contrato registrada en el HYD de cada mes; si en un período futuro se registra una desvinculación, el dashboard reportará automáticamente la cantidad y el motivo asociado.";
+  }
+  let remuneracionesPage = "", page1Of = "1 / 2", page2Of = "2 / 2";
+  if (d.total_haberes_periodo != null || d.total_aportes_periodo != null) {
+    let exclNoteAportes = "";
+    if (d.aportes_meses_excluidos.length) exclNoteAportes = ` (no incluye ${d.aportes_meses_excluidos.join(", ")}, meses sin esa información en el HYD entregado)`;
+    let exclNoteHaberes = "";
+    if (d.haberes_meses_excluidos && d.haberes_meses_excluidos.length) exclNoteHaberes = ` (no incluye ${d.haberes_meses_excluidos.join(", ")}, meses sin esa información en el HYD entregado)`;
+    let exclNoteImpuesto = "";
+    if (d.impuesto_meses_excluidos && d.impuesto_meses_excluidos.length) exclNoteImpuesto = ` (no incluye ${d.impuesto_meses_excluidos.join(", ")}, meses sin esa información en el HYD entregado)`;
+    const haberesImpKpi = d.total_haberes_imponibles_periodo != null ? fmtClp(d.total_haberes_imponibles_periodo) : "No disponible";
+    const haberesNoImpKpi = d.total_haberes_no_imponibles_periodo != null ? fmtClp(d.total_haberes_no_imponibles_periodo) : "No disponible";
+    const impuestoKpi = d.total_impuesto_unico_periodo != null ? fmtClp(d.total_impuesto_unico_periodo) : "No disponible";
+    const aportesKpi = d.total_aportes_periodo != null ? fmtClp(d.total_aportes_periodo) : "No disponible";
+    const haberesChartBlock = d.chart_haberes_mes || `<div class="section-sub" style="padding:16px 0;">No disponible: este HYD no trae la columna "Liquidación - Total Haberes".</div>`;
+    const aportesChartBlock = d.chart_aportes_mes || `<div class="section-sub" style="padding:16px 0;">No disponible: este HYD no trae la columna "Aportes Patronales - Total Aportes Patronales".</div>`;
+    remuneracionesPage = `
+<div class="page">
+  <div class="header">
+    <div><div class="brand">Capital Humano</div><h1>${esc2(company)}</h1><div class="sub">Remuneraciones y aportes patronales &middot; ${periodo}</div></div>
+    <div class="meta-block">${logoTag}<div class="meta"><div>Período reportado: <b>${periodo}</b></div></div></div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="label">Total haberes imponibles</div><div class="value" style="font-size:19px;">${haberesImpKpi}</div><div class="foot">acumulado ${periodo}${exclNoteHaberes}</div></div>
+    <div class="kpi"><div class="label">Total haberes no imponibles</div><div class="value" style="font-size:19px;">${haberesNoImpKpi}</div><div class="foot">acumulado ${periodo}${exclNoteHaberes}</div></div>
+    <div class="kpi"><div class="label">Impuesto único</div><div class="value" style="font-size:19px;">${impuestoKpi}</div><div class="foot">acumulado ${periodo}${exclNoteImpuesto}</div></div>
+    <div class="kpi"><div class="label">Total aportes patronales</div><div class="value" style="font-size:19px;">${aportesKpi}</div><div class="foot">acumulado ${periodo}${exclNoteAportes}</div></div>
+  </div>
+  <div class="section-sub" style="margin-bottom:12px;">Total haberes = sueldo bruto (imponible + no imponible) antes de descuentos. Aportes patronales incluye SIS, Mutual de Seguridad, Cotización de Expectativa de Vida, Afp Previsión Empleador y Aporte Cesantía Empleador (fondo solidario + cuenta individual). No incluye remuneraciones líquidas individuales de colaboradores.${d.bono_ajustes && d.bono_ajustes.length ? ` Incluye ${d.bono_ajustes.map((b) => `bono reliquidado de ${esc2(b.mesLabel)} ${b.anio} (${fmtClp(b.montoBruto)} bruto, ${b.colaboradores} colaborador${b.colaboradores===1?"":"es"})`).join(", ")}.` : ""}</div>
+  <div class="two-col">
+    <div class="section"><div class="section-title">Total haberes por mes</div><div class="section-sub">Millones de pesos ($ MM) en haberes imponibles y no imponibles</div><div class="card">${haberesChartBlock}</div></div>
+    <div class="section"><div class="section-title">Aportes patronales por mes</div><div class="section-sub">Millones de pesos ($ MM) pagados por la empresa</div><div class="card">${aportesChartBlock}</div></div>
+  </div>
+  <div class="footer"><span>Capital Humano &mdash; Cliente ${esc2(company)}</span><span>Información agregada y anonimizada.</span></div>
+  <div class="pagenum" style="position:absolute; bottom:5mm; right:14mm;">3 / 3</div>
+</div>`;
+    page1Of = "1 / 3"; page2Of = "2 / 3";
+  }
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Capital Humano — ${esc2(company)} — ${periodo}</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  /* Por defecto, al imprimir o "Guardar como PDF" los navegadores OMITEN los
+     colores de fondo (background) para ahorrar tinta — los gráficos (SVG con
+     fill) no se ven afectados, pero los cuadraditos de color de las leyendas
+     ("Indefinido"/"Plazo fijo"/etc., que usan background) sí desaparecían.
+     Esto fuerza a que se impriman tal cual se ven en pantalla. */
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1B2A4A; background: #f9f9f7; -webkit-font-smoothing: antialiased; }
+  .page { width: 210mm; height: 297mm; background: #fcfcfb; position: relative; padding: 15mm 14mm 12mm 14mm; page-break-after: always; overflow: hidden; }
+  .page:last-child { page-break-after: auto; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #1B2A4A; padding-bottom:10px; margin-bottom:16px; }
+  .header .brand { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#898781; font-weight:600; }
+  .header h1 { font-size:21px; margin:2px 0 0 0; font-weight:700; color:#1B2A4A; }
+  .header .sub { font-size:11.5px; color:#52514e; margin-top:3px; }
+  .header .meta { text-align:right; font-size:11px; color:#52514e; line-height:1.5; }
+  .header .meta b { color:#1B2A4A; }
+  .header .meta-block { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+  .ecr-logo { height:30px; width:auto; display:block; }
+  .ecr-logo svg { height:100%; width:auto; display:block; }
+  .kpi-row { display:flex; gap:8px; margin-bottom:13px; }
+  .kpi { flex:1; background:#fcfcfb; border:1px solid #e1e0d9; border-radius:8px; padding:10px 11px; min-width:0; }
+  .kpi .label { font-size:9.5px; color:#898781; text-transform:uppercase; letter-spacing:0.2px; font-weight:600; margin-bottom:5px; overflow-wrap:break-word; word-break:break-word; }
+  .kpi .value { font-size:20px; font-weight:700; color:#1B2A4A; line-height:1; }
+  .kpi .value .unit { font-size:12px; font-weight:600; color:#52514e; }
+  .kpi .delta { display:block; font-size:10px; margin-top:5px; font-weight:600; }
+  .kpi .delta.good { color:#006300; }
+  .kpi .delta.bad { color:#d03b3b; }
+  .kpi .foot { font-size:9.5px; color:#898781; margin-top:5px; }
+  .section { margin-bottom:11px; }
+  .section-title { font-size:13px; font-weight:700; margin:0 0 2px 0; }
+  .section-sub { font-size:10px; color:#898781; margin:0 0 8px 0; }
+  .card { border:1px solid #e1e0d9; border-radius:8px; padding:12px 14px 8px 14px; background:#fcfcfb; }
+  .legend { display:flex; gap:16px; font-size:10.5px; color:#52514e; margin-top:4px; padding-left:2px; flex-wrap:wrap; }
+  .legend .dot { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:middle; }
+  .two-col { display:flex; gap:12px; }
+  .two-col > div { flex:1; min-width:0; }
+  .info-card { border:1px solid #e1e0d9; border-radius:8px; padding:14px; background:#fcfcfb; height:100%; }
+  .info-card .big { font-size:30px; font-weight:700; line-height:1; margin-bottom:6px; }
+  .info-card .desc { font-size:11px; color:#52514e; line-height:1.5; }
+  .footer { position:absolute; bottom:10mm; left:14mm; right:14mm; font-size:8.8px; color:#898781; border-top:1px solid #e1e0d9; padding-top:6px; display:flex; justify-content:space-between; gap:16px; }
+  .footer span:first-child { white-space:nowrap; flex-shrink:0; }
+  .footer span:last-child { text-align:right; flex-shrink:1; }
+  .pagenum { font-size:8.8px; color:#898781; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div><div class="brand">Capital Humano</div><h1>${esc2(company)}</h1><div class="sub">Resumen ejecutivo &middot; ${periodo}</div></div>
+    <div class="meta-block">${logoTag}<div class="meta"><div>Período reportado: <b>${periodo}</b></div></div></div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="label">Dotación (${corte})</div><div class="value">${fmt(d.dot_cutoff)}</div>${deltaBadge(d.delta_dot, d.delta_pct)}</div>
+    <div class="kpi"><div class="label">Altas (incorp.)</div><div class="value">${fmt(d.altas_total)}</div><div class="foot">acumulado del período</div></div>
+    <div class="kpi"><div class="label">Finiquitos</div><div class="value">${fmt(d.bajas_total)}</div><div class="foot">acumulado del período</div></div>
+  </div>
+  <div class="section">
+    <div class="section-title">Evolución de la dotación y tipo de contrato</div>
+    <div class="section-sub">Barras: composición mensual por tipo de contrato &middot; Línea: dotación total por mes</div>
+    <div class="card">${d.chart_dotacion_contrato}<div class="legend">${legendItems}<span><span class="dot" style="background:${PALETTE.navy}"></span>Dotación total</span></div></div>
+  </div>
+  <div class="section">
+    <div class="section-title">Licencias médicas y ausencias por mes</div>
+    <div class="section-sub">Barras: días registrados en las liquidaciones del mes, por tipo &middot; Línea: colaboradores con licencia médica ese mes &middot; ${fmt(d.lic_total)} días de licencia médica y ${fmt(d.aus_total)} días de ausencia en el período</div>
+    <div class="card">${d.chart_licencias}<div class="legend"><span><span class="dot" style="background:#1baf7a"></span>Licencia médica (días)</span><span><span class="dot" style="background:#eda100"></span>Ausencia (días)</span><span><span class="dot" style="background:${PALETTE.navy}"></span>Colaboradores con licencia</span></div></div>
+  </div>
+  <div class="footer"><span>Capital Humano &mdash; Cliente ${esc2(company)}</span><span>Información agregada y anonimizada.</span></div>
+  <div class="pagenum" style="position:absolute; bottom:5mm; right:14mm;">${page1Of}</div>
+</div>
+<div class="page">
+  <div class="header">
+    <div><div class="brand">Capital Humano</div><h1>${esc2(company)}</h1><div class="sub">Composición de la dotación &middot; Corte ${corte}</div></div>
+    <div class="meta-block">${logoTag}<div class="meta"><div>Período reportado: <b>${periodo}</b></div></div></div>
+  </div>
+${areasSection}
+  <div class="two-col">
+    <div class="section"><div class="section-title">Sueldo base por tramo</div><div class="section-sub">Respecto al Ingreso Mínimo Mensual (${fmtClp(d.imm)}) y a ${fmtClp(d.tramo_umbral)} &middot; ${corte}</div><div class="card">${d.chart_tramo}</div></div>
+    <div class="section"><div class="section-title">Finiquitos y desvinculaciones</div><div class="section-sub">Acumulado del período &middot; ${periodo}</div><div class="info-card"><div class="big">${fmt(d.bajas_total)}</div><div class="desc">${finiquitoDesc}</div></div></div>
+  </div>
+  <div class="footer"><span>Capital Humano &mdash; Cliente ${esc2(company)}</span><span>Información agregada y anonimizada.</span></div>
+  <div class="pagenum" style="position:absolute; bottom:5mm; right:14mm;">${page2Of}</div>
+</div>
+${remuneracionesPage}
+</body>
+</html>`;
+}
+
+// ============================================================================
+// DJ 1887 — resumen mensual/anual de apoyo a partir de los mismos archivos
+// HYD que usa el Dashboard. Todo se calcula y se descarga en el navegador;
+// no se persiste nada en Firestore (el HYD ya declara en su propio panel que
+// nunca sube el detalle por colaborador, así que este resumen tampoco lo
+// hace — vive solo mientras la pestaña esté abierta). Por instrucción
+// expresa de Piera, el resultado NUNCA incluye RUT ni nombre del
+// colaborador: esos campos quedan en blanco para que ella los complete
+// después cruzando con sus propios registros. Como no hay ningún
+// identificador de colaborador entre archivos, el cruce entre meses (para
+// el total anual) se hace con fecha de nacimiento + fecha de ingreso a la
+// compañía — ambos datos ya se muestran igual como columnas de referencia,
+// así que no es una llave oculta. Se validó contra los 6 archivos reales de
+// Vivo (RG y RP, enero-junio 2026) que esta combinación no tiene colisiones.
+const DJ1887_HABERES_NO_IMPONIBLES_NETEADOS = ["deposito convenido"];
+const DJ1887_DESCUENTOS_RENTA_NETA = ["adicional salud", "cotiz. previ. obligatoria", "cotiz. prev. voluntaria", "cotiz. salud obligatoria"];
+
+// Renta Total Neta Pagada (Art. 42 N°1 LIR, DJ 1887): Haberes Imponibles menos
+// las cotizaciones previsionales y de salud de carácter obligatorio y/o
+// voluntario (instrucciones SII). El Seguro de Cesantía se muestra aparte
+// como referencia y NO se resta por defecto — el texto oficial del SII habla
+// de "cotizaciones previsionales y de salud", no menciona el seguro de
+// cesantía explícitamente, así que se deja a criterio del asesor tributario.
+function computeDJ1887EmployeeRows(rows, headerRow, cliente, clienteSlug, mes, mesLabel) {
+  headerRow = headerRow || [];
+  const colsImponibles = headerRow.filter((c) => c && c.startsWith("Haberes Imponibles - "));
+  const colsNoImponibles = headerRow.filter((c) => c && c.startsWith("Haberes No Imponibles - ")
+    && !DJ1887_HABERES_NO_IMPONIBLES_NETEADOS.includes(normAcc(c.slice("Haberes No Imponibles - ".length))));
+  const colsDescRentaNeta = headerRow.filter((c) => c && c.startsWith("Descuentos Legales - ")
+    && DJ1887_DESCUENTOS_RENTA_NETA.includes(normAcc(c.slice("Descuentos Legales - ".length))));
+  const hasImpuestoUnico = headerRow.includes("Descuentos Legales - Impuesto Único");
+  const hasSeguroCesantia = headerRow.includes("Descuentos Legales - Seguro Cesantía");
+
+  return rows.filter((r) => r["Liquidación - Período"] != null && r["Liquidación - Período"] !== "").map((r) => {
+    const haberesImponibles = colsImponibles.reduce((s, c) => s + num(r[c]), 0);
+    const rentaNoGravada = colsNoImponibles.reduce((s, c) => s + num(r[c]), 0);
+    const cotizPrevisionalSalud = colsDescRentaNeta.reduce((s, c) => s + num(r[c]), 0);
+    const rentaNetaPagada = haberesImponibles - cotizPrevisionalSalud;
+    const iuscRetenido = hasImpuestoUnico ? num(r["Descuentos Legales - Impuesto Único"]) : 0;
+    const seguroCesantia = hasSeguroCesantia ? num(r["Descuentos Legales - Seguro Cesantía"]) : 0;
+    return {
+      clienteSlug, cliente, mes, mesLabel,
+      fechaNacimiento: r["Colaborador - Fecha de Nacimiento"] == null ? null : r["Colaborador - Fecha de Nacimiento"],
+      fechaIngreso: r["Trabajo - Fecha Ingreso Compañía"] == null ? null : r["Trabajo - Fecha Ingreso Compañía"],
+      comuna: r["Colaborador - Comuna"] || "",
+      centroCosto: r["Trabajo - Centro de Costo"] || "",
+      cargo: r["Trabajo - Cargo"] || "",
+      tipoContrato: r["Trabajo - Tipo de Contrato"] || "",
+      haberesImponibles, cotizPrevisionalSalud, seguroCesantia,
+      rentaNetaPagada, iuscRetenido, rentaNoGravada,
+      montoIngresoMensual: rentaNetaPagada,
+    };
+  });
+}
+window.computeDJ1887EmployeeRows = computeDJ1887EmployeeRows;
+
+// Resumen "a la BUK": ya NO es por colaborador — son los montos TOTALES de
+// la empresa mes a mes (mismo formato que el "Resumen DDJJ 1887" que ya
+// conoce Piera de BUK: un bloque por empresa+año, filas 1-12 y un Total).
+// Se agrupa por cliente+año sumando las filas por colaborador que ya calculó
+// computeDJ1887EmployeeRows — así no hace falta ningún cruce entre meses
+// (ni fecha de nacimiento, ni ningún otro dato) porque no se muestra nada a
+// nivel de persona, solo el total de la compañía.
+function buildDj1887CompanyMonthlySummary(employeeRows) {
+  const groups = {}; const order = [];
+  employeeRows.forEach((row) => {
+    const anio = row.mes.slice(0, 4);
+    const gk = row.clienteSlug + "__" + anio;
+    if (!groups[gk]) { groups[gk] = { clienteSlug: row.clienteSlug, cliente: row.cliente, anio, meses: {} }; order.push(gk); }
+    const mesNum = Number(row.mes.slice(5, 7));
+    if (!groups[gk].meses[mesNum]) groups[gk].meses[mesNum] = { mesNum, rentaNetaPagada: 0, iuscRetenido: 0, rentaNoGravada: 0 };
+    groups[gk].meses[mesNum].rentaNetaPagada += row.rentaNetaPagada;
+    groups[gk].meses[mesNum].iuscRetenido += row.iuscRetenido;
+    groups[gk].meses[mesNum].rentaNoGravada += row.rentaNoGravada;
+  });
+  return order.map((gk) => {
+    const g = groups[gk];
+    const meses = Object.keys(g.meses).map(Number).sort((a, b) => a - b).map((n) => g.meses[n]);
+    const total = meses.reduce((acc, m) => ({
+      rentaNetaPagada: acc.rentaNetaPagada + m.rentaNetaPagada,
+      iuscRetenido: acc.iuscRetenido + m.iuscRetenido,
+      rentaNoGravada: acc.rentaNoGravada + m.rentaNoGravada,
+    }), { rentaNetaPagada: 0, iuscRetenido: 0, rentaNoGravada: 0 });
+    return { clienteSlug: g.clienteSlug, cliente: g.cliente, anio: g.anio, meses, total };
+  }).sort((a, b) => (a.clienteSlug === b.clienteSlug ? a.anio.localeCompare(b.anio) : a.cliente.localeCompare(b.cliente, "es")));
+}
+window.buildDj1887CompanyMonthlySummary = buildDj1887CompanyMonthlySummary;
+// Wrapper sin argumentos para que el QA (que corre en el contexto global de
+// la página, sin acceso a las variables privadas del módulo) pueda pedir el
+// resumen actual sin tener que reconstruir dj1887EmployeeRows a mano.
+window.getDj1887CompanyMonthlySummary = () => buildDj1887CompanyMonthlySummary(dj1887EmployeeRows);
+
+async function handleDj1887Files(fileList) {
+  for (const file of Array.from(fileList)) {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+      const headerRow = (aoa[0] || []).map((h) => (h == null ? "" : String(h).trim()));
+      const rows = aoa.slice(1).map((r) => {
+        const obj = {};
+        headerRow.forEach((h, idx) => { if (!h) return; const v = r[idx]; obj[h] = v === undefined ? null : v; });
+        return obj;
+      });
+      const entry = { file, rows, headerRow, error: null };
+      try {
+        const preview = peekPeriod(rows, headerRow);
+        entry.cliente = preview.cliente;
+        entry.clienteSlug = slugify(preview.cliente);
+        entry.mes = preview.mes;
+        entry.mesLabel = preview.mesLabel;
+        entry.dotacionPreview = preview.n;
+      } catch (e) {
+        entry.error = e.message;
+        entry.detectedHeaders = e.detected || null;
+      }
+      pendingDj1887Files.push(entry);
+    } catch (e) {
+      toast("No se pudo leer " + file.name + ": " + e.message, "warn");
+    }
+  }
+  renderDj1887FileRows();
+}
+
+function renderDj1887FileRows() {
+  const wrap = document.getElementById("dj1887FileRows");
+  const errorHtml = pendingDj1887Files.filter((e) => e.error).map((entry) => {
+    const detectedHtml = entry.detectedHeaders
+      ? `<details style="margin-top:8px;font-size:11.5px;color:var(--fg-muted);">
+          <summary style="cursor:pointer;">Ver columnas detectadas en el archivo (${entry.detectedHeaders.length})</summary>
+          <div style="margin-top:6px;line-height:1.6;">${entry.detectedHeaders.map(esc).join(", ")}</div>
+        </details>`
+      : "";
+    return `<div class="file-row err">
+      <div class="fname"><i class="fas fa-file-excel"></i> ${esc(entry.file.name)}</div>
+      <div class="errmsg"><i class="fas fa-triangle-exclamation"></i> ${esc(entry.error)}</div>
+      ${detectedHtml}
+    </div>`;
+  }).join("");
+
+  const okHtml = pendingDj1887Files.map((entry, idx) => ({ entry, idx })).filter((x) => !x.entry.error).map(({ entry, idx }) => {
+    return `<div class="file-row">
+      <div class="fmeta" style="font-weight:600;">${esc(entry.cliente)} &middot; ${esc(entry.mesLabel)} ${entry.mes.slice(0, 4)} &middot; ${entry.dotacionPreview} colaboradores</div>
+      <div class="fname" style="font-size:11.5px;font-weight:400;"><i class="fas fa-file-excel"></i> ${esc(entry.file.name)}
+        <button type="button" data-remove-dj1887="${idx}" style="background:none;border:none;color:var(--fg-muted);cursor:pointer;font-size:12px;margin-left:8px;"><i class="fas fa-xmark"></i> quitar</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  wrap.innerHTML = errorHtml + okHtml;
+  wrap.querySelectorAll("[data-remove-dj1887]").forEach((btn) => btn.addEventListener("click", () => {
+    pendingDj1887Files.splice(Number(btn.dataset.removeDj1887), 1);
+    renderDj1887FileRows();
+  }));
+
+  const btnGen = document.getElementById("btnGenerarDj1887");
+  btnGen.disabled = pendingDj1887Files.filter((e) => !e.error).length === 0;
+}
+
+function generateDj1887Summary() {
+  const okEntries = pendingDj1887Files.filter((e) => !e.error);
+  if (!okEntries.length) { toast("Sube al menos un archivo válido primero.", "warn"); return; }
+  dj1887EmployeeRows = [];
+  okEntries.forEach((entry) => {
+    const rows = computeDJ1887EmployeeRows(entry.rows, entry.headerRow, entry.cliente, entry.clienteSlug, entry.mes, entry.mesLabel);
+    dj1887EmployeeRows.push(...rows);
+  });
+  renderDj1887Results();
+  toast(`Resumen generado a partir de ${dj1887EmployeeRows.length} fila(s) de colaborador-mes.`);
+}
+
+const DJ1887_MESES_CORTOS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+function renderDj1887Results() {
+  const panel = document.getElementById("dj1887ResultPanel");
+  if (!dj1887EmployeeRows.length) { panel.style.display = "none"; return; }
+  panel.style.display = "";
+
+  const groups = buildDj1887CompanyMonthlySummary(dj1887EmployeeRows);
+  const html = groups.map((g) => {
+    const bodyRows = [];
+    for (let n = 1; n <= 12; n++) {
+      const m = g.meses.find((x) => x.mesNum === n);
+      bodyRows.push(`<tr>
+        <td>${n} <span style="color:var(--fg-muted);font-weight:400;">(${DJ1887_MESES_CORTOS[n-1]})</span></td>
+        <td class="num">${m ? fmtClp(m.rentaNetaPagada) : "—"}</td>
+        <td class="num">${m ? fmtClp(m.iuscRetenido) : "—"}</td>
+        <td class="num pend">$0</td>
+        <td class="num">${m ? fmtClp(m.rentaNoGravada) : "—"}</td>
+        <td class="num pend">$0</td>
+        <td class="num pend">$0</td>
+        <td class="num pend">$0</td>
+      </tr>`);
+    }
+    return `<div class="dj-company-block">
+      <div class="dj-company-banner">Resumen DDJJ ${esc(g.cliente)} <span class="dj-rut-pend">(RUT empresa: completar)</span> &mdash; año ${esc(g.anio)}</div>
+      <div class="dj-table-wrap"><table class="dj-table">
+        <thead><tr>
+          <th>Mes</th>
+          <th>Renta Total Neta Pagada (Art.42 N&deg;1)</th>
+          <th>Imp. Único Retenido (durante el año)</th>
+          <th>Imp. Único Retenido (Ene-Abr año sig.)</th>
+          <th>Renta Total No Gravada</th>
+          <th>Renta Total Exenta</th>
+          <th>Rebaja Zonas Extremas (D.L. 889)</th>
+          <th>3% Préstamo Tasa 0% 2021</th>
+        </tr></thead>
+        <tbody>${bodyRows.join("")}<tr class="dj-total">
+          <td>Total</td>
+          <td class="num">${fmtClp(g.total.rentaNetaPagada)}</td>
+          <td class="num">${fmtClp(g.total.iuscRetenido)}</td>
+          <td class="num pend">$0</td>
+          <td class="num">${fmtClp(g.total.rentaNoGravada)}</td>
+          <td class="num pend">$0</td>
+          <td class="num pend">$0</td>
+          <td class="num pend">$0</td>
+        </tr></tbody>
+      </table></div>
+    </div>`;
+  }).join("");
+  document.getElementById("dj1887ResultWrap").innerHTML = html;
+}
+
+// buildDj1887ExportRows() arma las filas planas (una por cliente+año+mes, más
+// una fila "Total" por cliente+año) que se escriben en el Excel — separado
+// de descargarDj1887Excel() (que dispara la descarga real) para que el QA
+// pueda llamar la parte de datos directo por window, igual que ya se hace
+// con buildAlertsExportRows/buildAnalisisWordHtml.
+function buildDj1887ExportRows() {
+  const groups = buildDj1887CompanyMonthlySummary(dj1887EmployeeRows);
+  const filas = [];
+  groups.forEach((g) => {
+    for (let n = 1; n <= 12; n++) {
+      const m = g.meses.find((x) => x.mesNum === n);
+      if (!m) continue; // mes no subido — no se inventa una fila en $0
+      filas.push({
+        "Cliente": g.cliente,
+        "Año": g.anio,
+        "Mes": n,
+        "Renta Total Neta Pagada (Art.42 N°1)": m.rentaNetaPagada,
+        "Impuesto Único Retenido (durante el año)": m.iuscRetenido,
+        "Impuesto Único Retenido (Ene-Abr año siguiente)": "",
+        "Renta Total No Gravada": m.rentaNoGravada,
+        "Renta Total Exenta": "",
+        "Rebaja Zonas Extremas (D.L. 889)": "",
+        "3% Préstamo Tasa 0% 2021": "",
+      });
+    }
+    filas.push({
+      "Cliente": g.cliente,
+      "Año": g.anio,
+      "Mes": "Total",
+      "Renta Total Neta Pagada (Art.42 N°1)": g.total.rentaNetaPagada,
+      "Impuesto Único Retenido (durante el año)": g.total.iuscRetenido,
+      "Impuesto Único Retenido (Ene-Abr año siguiente)": "",
+      "Renta Total No Gravada": g.total.rentaNoGravada,
+      "Renta Total Exenta": "",
+      "Rebaja Zonas Extremas (D.L. 889)": "",
+      "3% Préstamo Tasa 0% 2021": "",
+    });
+  });
+
+  const notas = [
+    { "Campo": "RUT empresa", "Nota": "El HYD no trae el RUT de la empresa — complétalo manualmente por cada cliente." },
+    { "Campo": "Renta Total Neta Pagada", "Nota": "= Haberes Imponibles − (Cotiz. Previsional Obligatoria + Voluntaria + Cotiz. Salud Obligatoria + Adicional Salud), según instrucciones SII, sumado por TODOS los colaboradores del mes. El Seguro de Cesantía NO se resta por defecto — confirma con tu asesor tributario si tu criterio lo descuenta." },
+    { "Campo": "Impuesto Único Retenido (Ene-Abr año siguiente)", "Nota": "No se puede calcular desde el HYD de este período — corresponde a remuneraciones de este año pagadas entre enero y abril del año siguiente; si aplica, complétalo con esos archivos (del año siguiente) por separado." },
+    { "Campo": "Renta Total No Gravada", "Nota": "= Haberes No Imponibles del HYD, excluyendo Depósito Convenido (se anula solo entre haber y descuento, no es un haber real), sumado por todos los colaboradores del mes." },
+    { "Campo": "Renta Total Exenta / Rebaja Zonas Extremas / 3% Préstamo Tasa 0% 2021", "Nota": "No hay datos en el HYD para calcularlas — completar manualmente si corresponde." },
+    { "Campo": "Meses sin fila", "Nota": "Si falta un mes en la tabla es porque no se subió ese archivo HYD todavía — no se asume $0, se deja fuera para no confundir 'sin datos' con 'realmente cero'." },
+    { "Campo": "Fuente y alcance", "Nota": "Calculado a partir de los mismos archivos HYD que usas en el Dashboard, sumado por empresa y mes (no por colaborador). Es un apoyo para armar la DJ 1887, no el archivo final para importar en el SII — revísalo con tu equipo contable/legal antes de declarar." },
+  ];
+
+  return { filas, notas };
+}
+window.buildDj1887ExportRows = buildDj1887ExportRows;
+
+function descargarDj1887Excel() {
+  const { filas, notas } = buildDj1887ExportRows();
+  if (!filas.length) { toast("Primero genera el resumen DJ 1887.", "warn"); return; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), "DDJJ 1887");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(notas), "Notas y campos pendientes");
+  XLSX.writeFile(wb, `dj1887_resumen_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  toast("Excel descargado.");
+}
+
+const dj1887DropZone = document.getElementById("dj1887DropZone");
+const dj1887FileInput = document.getElementById("dj1887FileInput");
+dj1887DropZone.addEventListener("click", () => dj1887FileInput.click());
+dj1887DropZone.addEventListener("dragover", (e) => { e.preventDefault(); dj1887DropZone.classList.add("drag"); });
+dj1887DropZone.addEventListener("dragleave", () => dj1887DropZone.classList.remove("drag"));
+dj1887DropZone.addEventListener("drop", (e) => {
+  e.preventDefault(); dj1887DropZone.classList.remove("drag");
+  handleDj1887Files(e.dataTransfer.files);
+});
+dj1887FileInput.addEventListener("change", (e) => { handleDj1887Files(e.target.files); dj1887FileInput.value = ""; });
+document.getElementById("btnGenerarDj1887").addEventListener("click", generateDj1887Summary);
+document.getElementById("btnDescargarDj1887Excel").addEventListener("click", descargarDj1887Excel);
+</script>
+</body>
+</html>
