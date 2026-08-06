@@ -629,6 +629,29 @@ function applyHydColumnSynonyms(headerRow, rows) {
   }
 }
 
+// Cada cliente configura su export de BUK con pequeñas diferencias de
+// formato en el nombre de columna (mayúsculas, tildes, espacios extra) que
+// no son un cambio real de dato, solo de rótulo — ej. "Liquidacion - Periodo"
+// o "Liquidación -  Período" (doble espacio) en vez de "Liquidación - Período".
+// Esto se detecta y corrige solo, comparando de forma insensible a
+// mayúsculas/tildes/espacios contra los nombres que el resto del código
+// espera (los esenciales + los que tienen sinónimos declarados). Las
+// diferencias de PALABRA real (no de formato) siguen necesitando un sinónimo
+// explícito en HYD_COLUMN_SYNONYMS.
+function normHeaderKey(s) { return normAcc(s).replace(/\s+/g, " "); }
+function canonicalizeHeaderFormatting(headerRow, rows) {
+  if (!headerRow.length) return;
+  const canonicalNames = HYD_ESSENTIAL.concat(Object.keys(HYD_COLUMN_SYNONYMS));
+  canonicalNames.forEach((canonical) => {
+    if (headerRow.includes(canonical)) return;
+    const normCanonical = normHeaderKey(canonical);
+    const match = headerRow.find((h) => h && normHeaderKey(h) === normCanonical);
+    if (!match) return;
+    headerRow.push(canonical);
+    rows.forEach((r) => { r[canonical] = r[match]; });
+  });
+}
+
 async function handleFiles(fileList) {
   for (const file of Array.from(fileList)) {
     try {
@@ -661,8 +684,9 @@ async function handleFiles(fileList) {
       // aportes patronales) pero no colaboradores nuevos.
       const isBono = headerRow.includes("Reliquidaciones - Monto");
       if (!isBono) {
-        injectSyntheticPeriodoIfMissing(headerRow, rows, file.name);
+        canonicalizeHeaderFormatting(headerRow, rows);
         applyHydColumnSynonyms(headerRow, rows);
+        injectSyntheticPeriodoIfMissing(headerRow, rows, file.name);
       }
       const entry = { file, rows, headerRow, error: null, kind: isBono ? "bono" : "roster" };
       try {
@@ -749,9 +773,14 @@ function renderFileRows() {
           <div style="margin-top:6px;line-height:1.6;">${entry.detectedHeaders.map(esc).join(", ")}</div>
         </details>`
       : "";
+    const isColumnasError = entry.error && entry.error.indexOf("Faltan columnas esenciales") === 0;
+    const hintHtml = isColumnasError
+      ? `<div style="margin-top:6px;font-size:11.5px;color:var(--fg-muted);">Si tu archivo sí trae este dato pero BUK lo llama distinto, avísale a Piera con el nombre del cliente — se agrega como sinónimo y no hace falta tocar el archivo.</div>`
+      : "";
     return `<div class="file-row err">
       <div class="fname"><i class="fas fa-file-excel"></i> ${esc(entry.file.name)}</div>
       <div class="errmsg"><i class="fas fa-triangle-exclamation"></i> ${esc(entry.error)}</div>
+      ${hintHtml}
       ${detectedHtml}
     </div>`;
   }).join("");
@@ -2518,8 +2547,9 @@ async function handleDj1887Files(fileList) {
       });
       // Un archivo de "bono reliquidado" no aplica acá (DJ 1887 usa solo los
       // archivos de rol), así que se sintetiza el período siempre que falte.
-      injectSyntheticPeriodoIfMissing(headerRow, rows, file.name);
+      canonicalizeHeaderFormatting(headerRow, rows);
       applyHydColumnSynonyms(headerRow, rows);
+      injectSyntheticPeriodoIfMissing(headerRow, rows, file.name);
       const entry = { file, rows, headerRow, error: null };
       try {
         const preview = peekPeriod(rows, headerRow);
@@ -2549,9 +2579,14 @@ function renderDj1887FileRows() {
           <div style="margin-top:6px;line-height:1.6;">${entry.detectedHeaders.map(esc).join(", ")}</div>
         </details>`
       : "";
+    const isColumnasError = entry.error && entry.error.indexOf("Faltan columnas esenciales") === 0;
+    const hintHtml = isColumnasError
+      ? `<div style="margin-top:6px;font-size:11.5px;color:var(--fg-muted);">Si tu archivo sí trae este dato pero BUK lo llama distinto, avísale a Piera con el nombre del cliente — se agrega como sinónimo y no hace falta tocar el archivo.</div>`
+      : "";
     return `<div class="file-row err">
       <div class="fname"><i class="fas fa-file-excel"></i> ${esc(entry.file.name)}</div>
       <div class="errmsg"><i class="fas fa-triangle-exclamation"></i> ${esc(entry.error)}</div>
+      ${hintHtml}
       ${detectedHtml}
     </div>`;
   }).join("");
