@@ -595,6 +595,21 @@ dropZone.addEventListener("drop", (e) => {
 });
 fileInput.addEventListener("change", (e) => { handleFiles(e.target.files); fileInput.value = ""; });
 
+// Algunos exports de BUK (ej. Evalueserve abr-jun 2026) no traen la columna
+// "Liquidación - Período" del todo. Si el nombre del archivo indica mes y año
+// (ej. "HYD EVALUESERVE RG 042026.xlsx"), se sintetiza esa fecha para cada fila
+// en vez de rechazar el archivo — el resto del código sigue igual, ya que solo
+// usa este campo para saber a qué mes pertenece cada fila. Se usa tanto en la
+// carga del Dashboard (handleFiles) como en la de DJ 1887 (handleDj1887Files).
+function injectSyntheticPeriodoIfMissing(headerRow, rows, filename) {
+  if (!headerRow.length || headerRow.includes("Liquidación - Período")) return;
+  const guess = parseMesFromFilename(filename);
+  if (!guess) return;
+  headerRow.push("Liquidación - Período");
+  const synth = guess.mes + "-15";
+  rows.forEach((r) => { r["Liquidación - Período"] = synth; });
+}
+
 async function handleFiles(fileList) {
   for (const file of Array.from(fileList)) {
     try {
@@ -626,19 +641,7 @@ async function handleFiles(fileList) {
       // detecta y se trata aparte: aporta plata al mes (haberes, impuesto,
       // aportes patronales) pero no colaboradores nuevos.
       const isBono = headerRow.includes("Reliquidaciones - Monto");
-      // Algunos exports de BUK (ej. Evalueserve abr-jun 2026) no traen la columna
-      // "Liquidación - Período" del todo. Si el nombre del archivo indica mes y año
-      // (ej. "HYD EVALUESERVE RG 042026.xlsx"), se sintetiza esa fecha para cada fila
-      // en vez de rechazar el archivo — el resto del código sigue igual, ya que solo
-      // usa este campo para saber a qué mes pertenece cada fila.
-      if (!isBono && headerRow.length && !headerRow.includes("Liquidación - Período")) {
-        const guess = parseMesFromFilename(file.name);
-        if (guess) {
-          headerRow.push("Liquidación - Período");
-          const synth = guess.mes + "-15";
-          rows.forEach((r) => { r["Liquidación - Período"] = synth; });
-        }
-      }
+      if (!isBono) injectSyntheticPeriodoIfMissing(headerRow, rows, file.name);
       const entry = { file, rows, headerRow, error: null, kind: isBono ? "bono" : "roster" };
       try {
         const preview = isBono ? peekPeriodBono(rows, headerRow) : peekPeriod(rows, headerRow);
@@ -2491,6 +2494,9 @@ async function handleDj1887Files(fileList) {
         headerRow.forEach((h, idx) => { if (!h) return; const v = r[idx]; obj[h] = v === undefined ? null : v; });
         return obj;
       });
+      // Un archivo de "bono reliquidado" no aplica acá (DJ 1887 usa solo los
+      // archivos de rol), así que se sintetiza el período siempre que falte.
+      injectSyntheticPeriodoIfMissing(headerRow, rows, file.name);
       const entry = { file, rows, headerRow, error: null };
       try {
         const preview = peekPeriod(rows, headerRow);
