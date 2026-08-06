@@ -626,6 +626,19 @@ async function handleFiles(fileList) {
       // detecta y se trata aparte: aporta plata al mes (haberes, impuesto,
       // aportes patronales) pero no colaboradores nuevos.
       const isBono = headerRow.includes("Reliquidaciones - Monto");
+      // Algunos exports de BUK (ej. Evalueserve abr-jun 2026) no traen la columna
+      // "Liquidación - Período" del todo. Si el nombre del archivo indica mes y año
+      // (ej. "HYD EVALUESERVE RG 042026.xlsx"), se sintetiza esa fecha para cada fila
+      // en vez de rechazar el archivo — el resto del código sigue igual, ya que solo
+      // usa este campo para saber a qué mes pertenece cada fila.
+      if (!isBono && headerRow.length && !headerRow.includes("Liquidación - Período")) {
+        const guess = parseMesFromFilename(file.name);
+        if (guess) {
+          headerRow.push("Liquidación - Período");
+          const synth = guess.mes + "-15";
+          rows.forEach((r) => { r["Liquidación - Período"] = synth; });
+        }
+      }
       const entry = { file, rows, headerRow, error: null, kind: isBono ? "bono" : "roster" };
       try {
         const preview = isBono ? peekPeriodBono(rows, headerRow) : peekPeriod(rows, headerRow);
@@ -1037,19 +1050,32 @@ function normAcc(s) { return String(s == null ? "" : s).normalize("NFD").replace
 
 const MESES_MAP_INV = { "enero":"01","febrero":"02","marzo":"03","abril":"04","mayo":"05","junio":"06","julio":"07","agosto":"08","septiembre":"09","setiembre":"09","octubre":"10","noviembre":"11","diciembre":"12" };
 
-// El archivo no trae el período adentro — se detecta del nombre (ej:
-// "Resumen de Procesos para auditoría abril 2026.xls" -> "2026-04").
+// El archivo no trae el período adentro — se detecta del nombre. Soporta dos
+// formatos: mes en palabras (ej: "Resumen de Procesos para auditoría abril
+// 2026.xls" -> "2026-04") y el formato "MMAAAA" pegado al final del nombre
+// que usan los export HYD de rol (ej: "HYD EVALUESERVE RG 042026.xlsx" ->
+// "2026-04").
 function parseMesFromFilename(name) {
   const norm = normAcc(name);
-  const yearMatch = norm.match(/20\d{2}/);
-  if (!yearMatch) return null;
-  const anio = yearMatch[0];
   let mm = null;
   for (const nombreMes in MESES_MAP_INV) {
     if (norm.includes(nombreMes)) { mm = MESES_MAP_INV[nombreMes]; break; }
   }
-  if (!mm) return null;
-  return { mes: anio + "-" + mm, mesLabel: MESES_ES[mm], anio };
+  if (mm) {
+    const yearMatch = norm.match(/20\d{2}/);
+    if (!yearMatch) return null;
+    return { mes: yearMatch[0] + "-" + mm, mesLabel: MESES_ES[mm], anio: yearMatch[0] };
+  }
+  // Fallback numérico: "...0420 26.xlsx" no, específicamente MM (01-12)
+  // pegado inmediatamente antes de AAAA, pegado inmediatamente antes de la
+  // extensión (ej. "042026.xlsx", "122026.xls") — así se evita confundir con
+  // otros números sueltos que pueda traer el nombre del archivo.
+  const numMatch = name.match(/(0[1-9]|1[0-2])(20\d{2})(?=\.[A-Za-z0-9]+$)/);
+  if (numMatch) {
+    const mm2 = numMatch[1], anio2 = numMatch[2];
+    return { mes: anio2 + "-" + mm2, mesLabel: MESES_ES[mm2], anio: anio2 };
+  }
+  return null;
 }
 
 // ----------------------------------------------------------------------
@@ -1713,7 +1739,12 @@ if (savedCfg && savedCfg.apiKey && savedCfg.projectId) {
 // ============================================================================
 
 const MESES_ES = { "01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"Jun","07":"Jul","08":"Ago","09":"Sep","10":"Oct","11":"Nov","12":"Dic" };
-const HYD_ESSENTIAL = ["Empresa - Nombre Empresa","Liquidación - Período","Trabajo - Tipo de Contrato","Trabajo - Fecha Ingreso Compañía","Trabajo - Fecha Término Trabajo","Trabajo - Sueldo Base","Liquidación - Sueldo Líquido","Liquidación - Días Licencias (reales)","Liquidación - Días Ausencias","Trabajo - Centro de Costo","Colaborador - Fecha de Nacimiento"];
+// Nota: "Trabajo - Tipo de Contrato" y "Trabajo - Centro de Costo" se sacaron de
+// esta lista (dejaron de ser "esenciales"): el resto del código ya las trata como
+// opcionales en todos lados donde se usan (fallback "Sin definir" / hasCol(...)),
+// así que exigirlas aquí solo bloqueaba clientes cuyo export de BUK no las trae
+// configuradas (ej. Evalueserve), sin que hiciera falta.
+const HYD_ESSENTIAL = ["Empresa - Nombre Empresa","Liquidación - Período","Trabajo - Fecha Ingreso Compañía","Trabajo - Fecha Término Trabajo","Trabajo - Sueldo Base","Liquidación - Sueldo Líquido","Liquidación - Días Licencias (reales)","Liquidación - Días Ausencias","Colaborador - Fecha de Nacimiento"];
 const PALETTE = { blue:"#0072BC", orange:"#F7931E", aqua:"#1baf7a", yellow:"#eda100", magenta:"#e87ba4", green:"#008300", violet:"#4a3aa7", red:"#e34948", navy:"#1B2A4A" };
 const INK_PRIMARY = "#0b0b0b", INK_SECONDARY = "#52514e", INK_MUTED = "#898781", GRID = "#e1e0d9", BASELINE = "#c3c2b7", SURFACE = "#fcfcfb";
 const FULL_W = 656, HALF_W = 306;
