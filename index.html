@@ -618,6 +618,9 @@ function injectSyntheticPeriodoIfMissing(headerRow, rows, filename) {
 // el archivo por una simple diferencia de rótulo.
 const HYD_COLUMN_SYNONYMS = {
   "Liquidación - Días Licencias (reales)": ["Liquidación - Días de Licencias (Aplicadas)"],
+  // Tres Valles no trae ninguna columna "Trabajo - ..." en su export de BUK;
+  // el sueldo base aparece igual, solo que catalogado como un haber imponible.
+  "Trabajo - Sueldo Base": ["Haberes Imponibles - Sueldo Base"],
 };
 function applyHydColumnSynonyms(headerRow, rows) {
   for (const canonical in HYD_COLUMN_SYNONYMS) {
@@ -727,7 +730,10 @@ function peekPeriod(rows, headerRow) {
   const mesKeys = Array.from(new Set(periodos.map(ymKey)));
   if (mesKeys.length > 1) throw new Error("Este archivo trae más de un período (" + mesKeys.join(", ") + "). Sube un archivo por mes.");
   const mm = mesKeys[0].split("-")[1];
-  return { cliente: empresas[0] || "Cliente", mes: mesKeys[0], mesLabel: MESES_ES[mm], n: clean.length };
+  // Si el archivo no trae "Empresa - Nombre Empresa" (ej. Tres Valles), se usa
+  // el cliente ya seleccionado/creado en la barra lateral en vez de rechazar
+  // el archivo o agruparlo bajo un "Cliente" genérico.
+  return { cliente: empresas[0] || curClienteNombre || "Cliente", mes: mesKeys[0], mesLabel: MESES_ES[mm], n: clean.length };
 }
 
 // Export "Reliquidaciones" (p.ej. bono anual reliquidado): trae Reliquidaciones -
@@ -1803,7 +1809,16 @@ const MESES_ES = { "01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"
 //   patrón que Total Haberes / Aportes Patronales (ej. OMS).
 // - "Colaborador - Fecha de Nacimiento": solo se usa como campo de referencia
 //   opcional en DJ 1887 (ya es null-safe ahí), no afecta ningún cálculo.
-const HYD_ESSENTIAL = ["Empresa - Nombre Empresa","Liquidación - Período","Trabajo - Fecha Ingreso Compañía","Trabajo - Fecha Término Trabajo","Trabajo - Sueldo Base","Liquidación - Sueldo Líquido","Liquidación - Días Licencias (reales)"];
+// - "Empresa - Nombre Empresa": si falta, se usa el cliente ya seleccionado/
+//   creado en la barra lateral en vez de rechazar el archivo (ej. Tres Valles,
+//   cuyo export de BUK no trae ninguna columna "Empresa - ...").
+// - "Trabajo - Fecha Ingreso Compañía" / "Trabajo - Fecha Término Trabajo": si
+//   faltan, Altas/Finiquitos quedan "no disponible" ese mes en vez de mostrar
+//   0 engañoso — mismo patrón que Días Ausencias (ej. Tres Valles).
+// - "Liquidación - Días Licencias (reales)": mismo patrón "no disponible" que
+//   Días Ausencias cuando BUK omite la columna por completo en un mes sin
+//   licencias (ej. Tres Valles, junio 2026).
+const HYD_ESSENTIAL = ["Liquidación - Período","Trabajo - Sueldo Base","Liquidación - Sueldo Líquido"];
 const PALETTE = { blue:"#0072BC", orange:"#F7931E", aqua:"#1baf7a", yellow:"#eda100", magenta:"#e87ba4", green:"#008300", violet:"#4a3aa7", red:"#e34948", navy:"#1B2A4A" };
 const INK_PRIMARY = "#0b0b0b", INK_SECONDARY = "#52514e", INK_MUTED = "#898781", GRID = "#e1e0d9", BASELINE = "#c3c2b7", SURFACE = "#fcfcfb";
 const FULL_W = 656, HALF_W = 306;
@@ -1848,7 +1863,7 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
   const rows = readRows(rawRows, headerRow);
   if (!rows.length) throw new Error("No se encontró ningún período válido en el archivo.");
   const empresas = Array.from(new Set(rows.map((r) => r["Empresa - Nombre Empresa"]).filter(Boolean)));
-  const company = empresas[0] || "Cliente";
+  const company = empresas[0] || curClienteNombre || "Cliente";
   const periodos = rows.map((r) => toDate(r["Liquidación - Período"])).filter(Boolean);
   const mesKeys = Array.from(new Set(periodos.map(ymKey)));
   if (mesKeys.length > 1) throw new Error("Este archivo trae más de un período distinto (" + mesKeys.join(", ") + "). Sube un archivo por mes.");
@@ -1861,9 +1876,16 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
   const tipoContratoCounts = {};
   rows.forEach((r) => { const t = r["Trabajo - Tipo de Contrato"] || "Sin definir"; tipoContratoCounts[t] = (tipoContratoCounts[t]||0)+1; });
 
+  // "Trabajo - Fecha Ingreso Compañía" / "Trabajo - Fecha Término Trabajo" no
+  // vienen configuradas en el export de BUK de todos los clientes (ej. Tres
+  // Valles) — igual que Días Ausencias, si falta la columna el dato queda
+  // "no disponible" (null) en vez de un 0 engañoso para Altas/Finiquitos.
+  const hasFechaIngreso = hasCol("Trabajo - Fecha Ingreso Compañía");
+  const hasFechaTermino = hasCol("Trabajo - Fecha Término Trabajo");
+
   let antigSum = 0, antigN = 0;
-  rows.forEach((r) => { const fi = toDate(r["Trabajo - Fecha Ingreso Compañía"]); if (fi) { antigSum += yearsBetween(refDate, fi); antigN++; } });
-  const antiguedadPromAnios = antigN ? antigSum/antigN : 0;
+  if (hasFechaIngreso) rows.forEach((r) => { const fi = toDate(r["Trabajo - Fecha Ingreso Compañía"]); if (fi) { antigSum += yearsBetween(refDate, fi); antigN++; } });
+  const antiguedadPromAnios = hasFechaIngreso ? (antigN ? antigSum/antigN : 0) : null;
 
   // "Días Ausencias" no viene configurado en el export de BUK de todos los
   // clientes (ej. OMS) — a diferencia de Tipo de Contrato/Centro de Costo, acá
@@ -1872,18 +1894,24 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
   // Patronales / Total Haberes: si falta la columna, ese mes queda excluido
   // del total en vez de sumar 0.
   const hasAusencias = hasCol("Liquidación - Días Ausencias");
-  let licenciaDiasTotal = 0, licenciaCasos = 0, ausenciaDiasTotal = hasAusencias ? 0 : null;
+  // BUK a veces omite por completo esta columna en un mes donde nadie tuvo
+  // licencias (ej. Tres Valles, junio 2026) — mismo patrón "no disponible"
+  // que Días Ausencias, en vez de contar 0 días silenciosamente.
+  const hasLicencias = hasCol("Liquidación - Días Licencias (reales)");
+  let licenciaDiasTotal = hasLicencias ? 0 : null, licenciaCasos = hasLicencias ? 0 : null, ausenciaDiasTotal = hasAusencias ? 0 : null;
   rows.forEach((r) => {
-    const lic = num(r["Liquidación - Días Licencias (reales)"]);
-    licenciaDiasTotal += lic; if (lic > 0) licenciaCasos++;
+    if (hasLicencias) {
+      const lic = num(r["Liquidación - Días Licencias (reales)"]);
+      licenciaDiasTotal += lic; if (lic > 0) licenciaCasos++;
+    }
     if (hasAusencias) ausenciaDiasTotal += num(r["Liquidación - Días Ausencias"]);
   });
 
-  let altas = 0;
-  rows.forEach((r) => { const fi = toDate(r["Trabajo - Fecha Ingreso Compañía"]); if (fi && ymKey(fi) === mes) altas++; });
+  let altas = hasFechaIngreso ? 0 : null;
+  if (hasFechaIngreso) rows.forEach((r) => { const fi = toDate(r["Trabajo - Fecha Ingreso Compañía"]); if (fi && ymKey(fi) === mes) altas++; });
 
-  let bajas = 0; const bajasMotivos = {};
-  rows.forEach((r) => {
+  let bajas = hasFechaTermino ? 0 : null; const bajasMotivos = {};
+  if (hasFechaTermino) rows.forEach((r) => {
     const ft = r["Trabajo - Fecha Término Trabajo"];
     if (ft != null && ft !== "") { bajas++; const mo = r["Trabajo - Razón de Término"]; if (mo) bajasMotivos[mo] = (bajasMotivos[mo]||0)+1; }
   });
@@ -1970,14 +1998,20 @@ function combineAggregates(list) {
   const deltaPct = dotFirst ? (deltaDot/dotFirst)*100 : 0;
   const pctIndef = dotCutoff ? ((cutoff.tipoContratoCounts["Indefinido"]||0)/dotCutoff)*100 : 0;
   const antigProm = cutoff.antiguedadPromAnios;
-  const licTotal = sorted.reduce((s,a)=>s+a.licenciaDiasTotal,0);
-  const licCasos = sorted.reduce((s,a)=>s+a.licenciaCasos,0);
+  const licMesesOk = sorted.filter((a)=>a.licenciaDiasTotal!=null);
+  const licMesesExcluidos = sorted.filter((a)=>a.licenciaDiasTotal==null).map((a)=>a.mes);
+  const licTotal = licMesesOk.length ? licMesesOk.reduce((s,a)=>s+a.licenciaDiasTotal,0) : null;
+  const licCasos = licMesesOk.length ? licMesesOk.reduce((s,a)=>s+a.licenciaCasos,0) : null;
   const ausMesesOk = sorted.filter((a)=>a.ausenciaDiasTotal!=null);
   const ausMesesExcluidos = sorted.filter((a)=>a.ausenciaDiasTotal==null).map((a)=>a.mes);
   const ausTotal = ausMesesOk.length ? ausMesesOk.reduce((s,a)=>s+a.ausenciaDiasTotal,0) : null;
-  const altasTotal = sorted.reduce((s,a)=>s+a.altas,0);
-  const bajasTotal = sorted.reduce((s,a)=>s+a.bajas,0);
-  const bajasMotivos = {}; sorted.forEach((a)=>Object.entries(a.bajasMotivos||{}).forEach(([k,v])=>{bajasMotivos[k]=(bajasMotivos[k]||0)+v;}));
+  const altasMesesOk = sorted.filter((a)=>a.altas!=null);
+  const altasMesesExcluidos = sorted.filter((a)=>a.altas==null).map((a)=>a.mes);
+  const altasTotal = altasMesesOk.length ? altasMesesOk.reduce((s,a)=>s+a.altas,0) : null;
+  const bajasMesesOk = sorted.filter((a)=>a.bajas!=null);
+  const bajasMesesExcluidos = sorted.filter((a)=>a.bajas==null).map((a)=>a.mes);
+  const bajasTotal = bajasMesesOk.length ? bajasMesesOk.reduce((s,a)=>s+a.bajas,0) : null;
+  const bajasMotivos = {}; bajasMesesOk.forEach((a)=>Object.entries(a.bajasMotivos||{}).forEach(([k,v])=>{bajasMotivos[k]=(bajasMotivos[k]||0)+v;}));
   const aportesMesesOk = sorted.filter((a)=>a.aportesPatronalesTotal!=null);
   const aportesMesesExcluidos = sorted.filter((a)=>a.aportesPatronalesTotal==null).map((a)=>a.mes);
   const totalAportesPeriodo = aportesMesesOk.length ? aportesMesesOk.reduce((s,a)=>s+a.aportesPatronalesTotal,0) : null;
@@ -1997,8 +2031,8 @@ function combineAggregates(list) {
   const paletteCycle = [PALETTE.blue, PALETTE.orange, PALETTE.aqua, PALETTE.yellow];
   const contratoColors = tiposContrato.map((_,i)=>paletteCycle[i%paletteCycle.length]);
   const contratoSeries = {}; tiposContrato.forEach((t)=>{contratoSeries[t]=sorted.map((a)=>a.tipoContratoCounts[t]||0);});
-  const licPorMes = sorted.map((a)=>a.licenciaDiasTotal), ausPorMes = sorted.map((a)=>a.ausenciaDiasTotal==null?0:a.ausenciaDiasTotal);
-  const licCasosPorMes = sorted.map((a)=>a.licenciaCasos);
+  const licPorMes = sorted.map((a)=>a.licenciaDiasTotal==null?0:a.licenciaDiasTotal), ausPorMes = sorted.map((a)=>a.ausenciaDiasTotal==null?0:a.ausenciaDiasTotal);
+  const licCasosPorMes = sorted.map((a)=>a.licenciaCasos==null?0:a.licenciaCasos);
   let areasItems = null, areasCostoItems = null;
   if (cutoff.areaCounts) {
     const entries = Object.entries(cutoff.areaCounts).sort((a,b)=>b[1]-a[1]);
@@ -2018,8 +2052,10 @@ function combineAggregates(list) {
     mes_cutoff_label: cutoff.mesLabel, anio_cutoff: anioCutoff, periodo_label: periodoLabel,
     dot_cutoff: dotCutoff, dot_first: dotFirst, delta_dot: deltaDot, delta_pct: deltaPct,
     pct_indef: pctIndef, antig_prom: antigProm,
-    lic_total: licTotal, lic_casos: licCasos, aus_total: ausTotal, aus_meses_excluidos: ausMesesExcluidos,
-    altas_total: altasTotal, bajas_total: bajasTotal,
+    lic_total: licTotal, lic_casos: licCasos, lic_meses_excluidos: licMesesExcluidos,
+    aus_total: ausTotal, aus_meses_excluidos: ausMesesExcluidos,
+    altas_total: altasTotal, altas_meses_excluidos: altasMesesExcluidos,
+    bajas_total: bajasTotal, bajas_meses_excluidos: bajasMesesExcluidos,
     bajas_motivos: Object.entries(bajasMotivos).sort((a,b)=>b[1]-a[1]),
     total_aportes_periodo: totalAportesPeriodo, aportes_meses_excluidos: aportesMesesExcluidos,
     total_haberes_periodo: totalHaberesPeriodo, haberes_meses_excluidos: haberesMesesExcluidos,
@@ -2315,8 +2351,15 @@ function renderDashboardHTML(pieces, logoSvg) {
     <div class="section-sub">Cantidad de colaboradores${d._areasCostoItems ? " y costo empresa ($ MM, bruto + aportes patronales)" : ""} por área &middot; ${corte}</div>
     <div class="card">${d.chart_areas}</div>
   </div>`;
+  const licPart = d.lic_total != null
+    ? `${fmt(d.lic_total)} días de licencia médica${d.lic_meses_excluidos && d.lic_meses_excluidos.length ? ` (no incluye ${d.lic_meses_excluidos.join(", ")}, meses sin esa columna en el HYD entregado)` : ""}`
+    : `días de licencia médica: no disponible (el HYD entregado no trae esa columna)`;
+  const altasKpi = d.altas_total != null ? fmt(d.altas_total) : "No disponible";
+  const bajasKpi = d.bajas_total != null ? fmt(d.bajas_total) : "No disponible";
   let finiquitoDesc;
-  if (d.bajas_total && d.bajas_motivos.length) {
+  if (d.bajas_total == null) {
+    finiquitoDesc = "No disponible: el HYD entregado no trae la columna \"Trabajo - Fecha Término Trabajo\" para calcular este indicador.";
+  } else if (d.bajas_total && d.bajas_motivos.length) {
     finiquitoDesc = `Motivos registrados en el HYD: ${d.bajas_motivos.map(([m,n])=>`${esc2(m)} (${n})`).join(", ")}.`;
   } else if (d.bajas_total) {
     finiquitoDesc = "Se registraron desvinculaciones en el período, pero el HYD no trae el motivo asociado para este cliente.";
@@ -2419,8 +2462,8 @@ function renderDashboardHTML(pieces, logoSvg) {
   </div>
   <div class="kpi-row">
     <div class="kpi"><div class="label">Dotación (${corte})</div><div class="value">${fmt(d.dot_cutoff)}</div>${deltaBadge(d.delta_dot, d.delta_pct)}</div>
-    <div class="kpi"><div class="label">Altas (incorp.)</div><div class="value">${fmt(d.altas_total)}</div><div class="foot">acumulado del período</div></div>
-    <div class="kpi"><div class="label">Finiquitos</div><div class="value">${fmt(d.bajas_total)}</div><div class="foot">acumulado del período</div></div>
+    <div class="kpi"><div class="label">Altas (incorp.)</div><div class="value">${altasKpi}</div><div class="foot">acumulado del período</div></div>
+    <div class="kpi"><div class="label">Finiquitos</div><div class="value">${bajasKpi}</div><div class="foot">acumulado del período</div></div>
   </div>
   <div class="section">
     <div class="section-title">Evolución de la dotación y tipo de contrato</div>
@@ -2429,7 +2472,7 @@ function renderDashboardHTML(pieces, logoSvg) {
   </div>
   <div class="section">
     <div class="section-title">Licencias médicas y ausencias por mes</div>
-    <div class="section-sub">Barras: días registrados en las liquidaciones del mes, por tipo &middot; Línea: colaboradores con licencia médica ese mes &middot; ${fmt(d.lic_total)} días de licencia médica${
+    <div class="section-sub">Barras: días registrados en las liquidaciones del mes, por tipo &middot; Línea: colaboradores con licencia médica ese mes &middot; ${licPart}${
       d.aus_total != null
         ? ` y ${fmt(d.aus_total)} días de ausencia en el período${d.aus_meses_excluidos && d.aus_meses_excluidos.length ? ` (no incluye ${d.aus_meses_excluidos.join(", ")}, meses sin esa columna en el HYD entregado)` : ""}`
         : (d.aus_meses_excluidos && d.aus_meses_excluidos.length ? ` &middot; días de ausencia: no disponible (el HYD entregado no trae esa columna)` : "")
@@ -2447,7 +2490,7 @@ function renderDashboardHTML(pieces, logoSvg) {
 ${areasSection}
   <div class="two-col">
     <div class="section"><div class="section-title">Sueldo base por tramo</div><div class="section-sub">Respecto al Ingreso Mínimo Mensual (${fmtClp(d.imm)}) y a ${fmtClp(d.tramo_umbral)} &middot; ${corte}</div><div class="card">${d.chart_tramo}</div></div>
-    <div class="section"><div class="section-title">Finiquitos y desvinculaciones</div><div class="section-sub">Acumulado del período &middot; ${periodo}</div><div class="info-card"><div class="big">${fmt(d.bajas_total)}</div><div class="desc">${finiquitoDesc}</div></div></div>
+    <div class="section"><div class="section-title">Finiquitos y desvinculaciones</div><div class="section-sub">Acumulado del período &middot; ${periodo}</div><div class="info-card"><div class="big">${bajasKpi}</div><div class="desc">${finiquitoDesc}</div></div></div>
   </div>
   <div class="footer"><span>Capital Humano &mdash; Cliente ${esc2(company)}</span><span>Información agregada y anonimizada.</span></div>
   <div class="pagenum" style="position:absolute; bottom:5mm; right:14mm;">${page2Of}</div>
