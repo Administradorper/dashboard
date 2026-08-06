@@ -610,6 +610,25 @@ function injectSyntheticPeriodoIfMissing(headerRow, rows, filename) {
   rows.forEach((r) => { r["Liquidación - Período"] = synth; });
 }
 
+// Distintos clientes tienen configurado su export de BUK con nombres de columna
+// levemente distintos para el mismo dato (ej. Typack usa "Liquidación - Días de
+// Licencias (Aplicadas)" en vez de "Liquidación - Días Licencias (reales)" que
+// usa Vivo). Acá se mapean esos sinónimos conocidos al nombre canónico que usa
+// el resto del código, copiando el valor a una columna nueva en vez de rechazar
+// el archivo por una simple diferencia de rótulo.
+const HYD_COLUMN_SYNONYMS = {
+  "Liquidación - Días Licencias (reales)": ["Liquidación - Días de Licencias (Aplicadas)"],
+};
+function applyHydColumnSynonyms(headerRow, rows) {
+  for (const canonical in HYD_COLUMN_SYNONYMS) {
+    if (!headerRow.length || headerRow.includes(canonical)) continue;
+    const alt = HYD_COLUMN_SYNONYMS[canonical].find((a) => headerRow.includes(a));
+    if (!alt) continue;
+    headerRow.push(canonical);
+    rows.forEach((r) => { r[canonical] = r[alt]; });
+  }
+}
+
 async function handleFiles(fileList) {
   for (const file of Array.from(fileList)) {
     try {
@@ -641,7 +660,10 @@ async function handleFiles(fileList) {
       // detecta y se trata aparte: aporta plata al mes (haberes, impuesto,
       // aportes patronales) pero no colaboradores nuevos.
       const isBono = headerRow.includes("Reliquidaciones - Monto");
-      if (!isBono) injectSyntheticPeriodoIfMissing(headerRow, rows, file.name);
+      if (!isBono) {
+        injectSyntheticPeriodoIfMissing(headerRow, rows, file.name);
+        applyHydColumnSynonyms(headerRow, rows);
+      }
       const entry = { file, rows, headerRow, error: null, kind: isBono ? "bono" : "roster" };
       try {
         const preview = isBono ? peekPeriodBono(rows, headerRow) : peekPeriod(rows, headerRow);
@@ -2497,6 +2519,7 @@ async function handleDj1887Files(fileList) {
       // Un archivo de "bono reliquidado" no aplica acá (DJ 1887 usa solo los
       // archivos de rol), así que se sintetiza el período siempre que falte.
       injectSyntheticPeriodoIfMissing(headerRow, rows, file.name);
+      applyHydColumnSynonyms(headerRow, rows);
       const entry = { file, rows, headerRow, error: null };
       try {
         const preview = peekPeriod(rows, headerRow);
