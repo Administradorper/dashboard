@@ -1793,12 +1793,17 @@ if (savedCfg && savedCfg.apiKey && savedCfg.projectId) {
 // ============================================================================
 
 const MESES_ES = { "01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"Jun","07":"Jul","08":"Ago","09":"Sep","10":"Oct","11":"Nov","12":"Dic" };
-// Nota: "Trabajo - Tipo de Contrato" y "Trabajo - Centro de Costo" se sacaron de
-// esta lista (dejaron de ser "esenciales"): el resto del código ya las trata como
-// opcionales en todos lados donde se usan (fallback "Sin definir" / hasCol(...)),
-// así que exigirlas aquí solo bloqueaba clientes cuyo export de BUK no las trae
-// configuradas (ej. Evalueserve), sin que hiciera falta.
-const HYD_ESSENTIAL = ["Empresa - Nombre Empresa","Liquidación - Período","Trabajo - Fecha Ingreso Compañía","Trabajo - Fecha Término Trabajo","Trabajo - Sueldo Base","Liquidación - Sueldo Líquido","Liquidación - Días Licencias (reales)","Liquidación - Días Ausencias","Colaborador - Fecha de Nacimiento"];
+// Nota: estas columnas se sacaron de la lista de "esenciales" porque distintos
+// clientes las configuran distinto (o simplemente no las traen) en su export de
+// BUK, y el resto del código ya las trata como opcionales sin romper nada:
+// - "Trabajo - Tipo de Contrato" / "Trabajo - Centro de Costo": fallback "Sin
+//   definir" / hasCol(...) (ej. Evalueserve).
+// - "Liquidación - Días Ausencias": si falta, ese mes queda excluido del total
+//   de ausencias (se muestra "no disponible" en vez de un 0 engañoso) — mismo
+//   patrón que Total Haberes / Aportes Patronales (ej. OMS).
+// - "Colaborador - Fecha de Nacimiento": solo se usa como campo de referencia
+//   opcional en DJ 1887 (ya es null-safe ahí), no afecta ningún cálculo.
+const HYD_ESSENTIAL = ["Empresa - Nombre Empresa","Liquidación - Período","Trabajo - Fecha Ingreso Compañía","Trabajo - Fecha Término Trabajo","Trabajo - Sueldo Base","Liquidación - Sueldo Líquido","Liquidación - Días Licencias (reales)"];
 const PALETTE = { blue:"#0072BC", orange:"#F7931E", aqua:"#1baf7a", yellow:"#eda100", magenta:"#e87ba4", green:"#008300", violet:"#4a3aa7", red:"#e34948", navy:"#1B2A4A" };
 const INK_PRIMARY = "#0b0b0b", INK_SECONDARY = "#52514e", INK_MUTED = "#898781", GRID = "#e1e0d9", BASELINE = "#c3c2b7", SURFACE = "#fcfcfb";
 const FULL_W = 656, HALF_W = 306;
@@ -1851,6 +1856,7 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
   const [anio, mm] = mes.split("-");
   const refDate = monthEndUTC(periodos[0]);
   const dotacion = rows.length;
+  const hasCol = (col) => (headerRow ? headerRow.includes(col) : rows.length > 0 && col in rows[0]);
 
   const tipoContratoCounts = {};
   rows.forEach((r) => { const t = r["Trabajo - Tipo de Contrato"] || "Sin definir"; tipoContratoCounts[t] = (tipoContratoCounts[t]||0)+1; });
@@ -1859,11 +1865,18 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
   rows.forEach((r) => { const fi = toDate(r["Trabajo - Fecha Ingreso Compañía"]); if (fi) { antigSum += yearsBetween(refDate, fi); antigN++; } });
   const antiguedadPromAnios = antigN ? antigSum/antigN : 0;
 
-  let licenciaDiasTotal = 0, licenciaCasos = 0, ausenciaDiasTotal = 0;
+  // "Días Ausencias" no viene configurado en el export de BUK de todos los
+  // clientes (ej. OMS) — a diferencia de Tipo de Contrato/Centro de Costo, acá
+  // un 0 por defecto sería engañoso (parecería "cero ausencias" en vez de
+  // "dato no disponible"), así que se sigue el mismo patrón que Aportes
+  // Patronales / Total Haberes: si falta la columna, ese mes queda excluido
+  // del total en vez de sumar 0.
+  const hasAusencias = hasCol("Liquidación - Días Ausencias");
+  let licenciaDiasTotal = 0, licenciaCasos = 0, ausenciaDiasTotal = hasAusencias ? 0 : null;
   rows.forEach((r) => {
     const lic = num(r["Liquidación - Días Licencias (reales)"]);
-    const aus = num(r["Liquidación - Días Ausencias"]);
-    licenciaDiasTotal += lic; if (lic > 0) licenciaCasos++; ausenciaDiasTotal += aus;
+    licenciaDiasTotal += lic; if (lic > 0) licenciaCasos++;
+    if (hasAusencias) ausenciaDiasTotal += num(r["Liquidación - Días Ausencias"]);
   });
 
   let altas = 0;
@@ -1877,8 +1890,6 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
 
   let salarioLiquidoSum = 0, salarioLiquidoCount = 0;
   rows.forEach((r) => { const v = r["Liquidación - Sueldo Líquido"]; if (v != null && v !== "") { salarioLiquidoSum += num(v); salarioLiquidoCount++; } });
-
-  const hasCol = (col) => (headerRow ? headerRow.includes(col) : rows.length > 0 && col in rows[0]);
 
   const hasAportes = hasCol("Aportes Patronales - Total Aportes Patronales");
   let aportesPatronalesTotal = null;
@@ -1961,7 +1972,9 @@ function combineAggregates(list) {
   const antigProm = cutoff.antiguedadPromAnios;
   const licTotal = sorted.reduce((s,a)=>s+a.licenciaDiasTotal,0);
   const licCasos = sorted.reduce((s,a)=>s+a.licenciaCasos,0);
-  const ausTotal = sorted.reduce((s,a)=>s+a.ausenciaDiasTotal,0);
+  const ausMesesOk = sorted.filter((a)=>a.ausenciaDiasTotal!=null);
+  const ausMesesExcluidos = sorted.filter((a)=>a.ausenciaDiasTotal==null).map((a)=>a.mes);
+  const ausTotal = ausMesesOk.length ? ausMesesOk.reduce((s,a)=>s+a.ausenciaDiasTotal,0) : null;
   const altasTotal = sorted.reduce((s,a)=>s+a.altas,0);
   const bajasTotal = sorted.reduce((s,a)=>s+a.bajas,0);
   const bajasMotivos = {}; sorted.forEach((a)=>Object.entries(a.bajasMotivos||{}).forEach(([k,v])=>{bajasMotivos[k]=(bajasMotivos[k]||0)+v;}));
@@ -1984,7 +1997,7 @@ function combineAggregates(list) {
   const paletteCycle = [PALETTE.blue, PALETTE.orange, PALETTE.aqua, PALETTE.yellow];
   const contratoColors = tiposContrato.map((_,i)=>paletteCycle[i%paletteCycle.length]);
   const contratoSeries = {}; tiposContrato.forEach((t)=>{contratoSeries[t]=sorted.map((a)=>a.tipoContratoCounts[t]||0);});
-  const licPorMes = sorted.map((a)=>a.licenciaDiasTotal), ausPorMes = sorted.map((a)=>a.ausenciaDiasTotal);
+  const licPorMes = sorted.map((a)=>a.licenciaDiasTotal), ausPorMes = sorted.map((a)=>a.ausenciaDiasTotal==null?0:a.ausenciaDiasTotal);
   const licCasosPorMes = sorted.map((a)=>a.licenciaCasos);
   let areasItems = null, areasCostoItems = null;
   if (cutoff.areaCounts) {
@@ -2005,7 +2018,7 @@ function combineAggregates(list) {
     mes_cutoff_label: cutoff.mesLabel, anio_cutoff: anioCutoff, periodo_label: periodoLabel,
     dot_cutoff: dotCutoff, dot_first: dotFirst, delta_dot: deltaDot, delta_pct: deltaPct,
     pct_indef: pctIndef, antig_prom: antigProm,
-    lic_total: licTotal, lic_casos: licCasos, aus_total: ausTotal,
+    lic_total: licTotal, lic_casos: licCasos, aus_total: ausTotal, aus_meses_excluidos: ausMesesExcluidos,
     altas_total: altasTotal, bajas_total: bajasTotal,
     bajas_motivos: Object.entries(bajasMotivos).sort((a,b)=>b[1]-a[1]),
     total_aportes_periodo: totalAportesPeriodo, aportes_meses_excluidos: aportesMesesExcluidos,
@@ -2416,7 +2429,11 @@ function renderDashboardHTML(pieces, logoSvg) {
   </div>
   <div class="section">
     <div class="section-title">Licencias médicas y ausencias por mes</div>
-    <div class="section-sub">Barras: días registrados en las liquidaciones del mes, por tipo &middot; Línea: colaboradores con licencia médica ese mes &middot; ${fmt(d.lic_total)} días de licencia médica y ${fmt(d.aus_total)} días de ausencia en el período</div>
+    <div class="section-sub">Barras: días registrados en las liquidaciones del mes, por tipo &middot; Línea: colaboradores con licencia médica ese mes &middot; ${fmt(d.lic_total)} días de licencia médica${
+      d.aus_total != null
+        ? ` y ${fmt(d.aus_total)} días de ausencia en el período${d.aus_meses_excluidos && d.aus_meses_excluidos.length ? ` (no incluye ${d.aus_meses_excluidos.join(", ")}, meses sin esa columna en el HYD entregado)` : ""}`
+        : (d.aus_meses_excluidos && d.aus_meses_excluidos.length ? ` &middot; días de ausencia: no disponible (el HYD entregado no trae esa columna)` : "")
+    }</div>
     <div class="card">${d.chart_licencias}<div class="legend"><span><span class="dot" style="background:#1baf7a"></span>Licencia médica (días)</span><span><span class="dot" style="background:#eda100"></span>Ausencia (días)</span><span><span class="dot" style="background:${PALETTE.navy}"></span>Colaboradores con licencia</span></div></div>
   </div>
   <div class="footer"><span>Capital Humano &mdash; Cliente ${esc2(company)}</span><span>Información agregada y anonimizada.</span></div>
