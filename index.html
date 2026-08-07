@@ -770,8 +770,12 @@ function peekPeriod(rows, headerRow) {
 // Dif. Afp Prevision Empleador/Dif. Cotización Expectativa de Vida/dif_aportes_empleador,
 // pero no las columnas de rol (Tipo de Contrato, Centro de Costo, etc.) — cada fila
 // es un colaborador que recibió una reliquidación ese mes, no un colaborador nuevo.
+// "Empresa - Nombre Empresa" es deseable pero no todos los export de
+// reliquidación la traen (ej. Transelec) — igual que en peekPeriod(), si falta
+// se usa el cliente ya seleccionado/creado en la barra lateral en vez de
+// rechazar el archivo.
 function peekPeriodBono(rows, headerRow) {
-  const required = ["Empresa - Nombre Empresa", "Reliquidaciones - mes", "Reliquidaciones - Monto"];
+  const required = ["Reliquidaciones - mes", "Reliquidaciones - Monto"];
   const missing = required.filter((c) => !headerRow.includes(c));
   if (missing.length) {
     const detected = headerRow.filter(Boolean);
@@ -781,13 +785,16 @@ function peekPeriodBono(rows, headerRow) {
   }
   const clean = rows.filter((r) => r["Reliquidaciones - mes"] != null && r["Reliquidaciones - mes"] !== "");
   if (!clean.length) throw new Error("No se encontró ningún período válido en este archivo de reliquidación.");
-  const empresas = Array.from(new Set(clean.map((r) => r["Empresa - Nombre Empresa"]).filter(Boolean)));
+  const empresas = headerRow.includes("Empresa - Nombre Empresa")
+    ? Array.from(new Set(clean.map((r) => r["Empresa - Nombre Empresa"]).filter(Boolean)))
+    : [];
   const periodos = clean.map((r) => toDate(r["Reliquidaciones - mes"])).filter(Boolean);
   const mesKeys = Array.from(new Set(periodos.map(ymKey)));
   if (mesKeys.length > 1) throw new Error("Este archivo de reliquidación trae más de un período (" + mesKeys.join(", ") + "). Sube un archivo por mes.");
   const mm = mesKeys[0].split("-")[1];
   const montoTotal = clean.reduce((s, r) => s + num(r["Reliquidaciones - Monto"]), 0);
-  return { cliente: empresas[0] || "Cliente", mes: mesKeys[0], mesLabel: MESES_ES[mm], n: clean.length, montoTotal };
+  const cliente = (empresas.length === 1 ? empresas[0] : null) || curClienteNombre || empresas[0] || "Cliente";
+  return { cliente, mes: mesKeys[0], mesLabel: MESES_ES[mm], n: clean.length, montoTotal };
 }
 
 // Los archivos que llegan para un mismo mes (p.ej. rol general + rol privado,
