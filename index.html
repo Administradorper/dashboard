@@ -2644,8 +2644,18 @@ function computeDJ1887EmployeeRows(rows, headerRow, cliente, clienteSlug, mes, m
     const rentaNetaPagada = haberesImponibles - cotizPrevisionalSalud;
     const iuscRetenido = hasImpuestoUnico ? num(r["Descuentos Legales - Impuesto Único"]) : 0;
     const seguroCesantia = hasSeguroCesantia ? num(r["Descuentos Legales - Seguro Cesantía"]) : 0;
+    // La DJ 1887 se declara ante el SII por RUT/razón social, no por el
+    // "cliente" agrupado que usa el Dashboard — para clientes que combinan
+    // varias razones sociales en un mismo archivo (ej. Filopulli) cada fila
+    // debe quedar bajo SU PROPIA razón social, para que el resumen mensual
+    // y el total anual salgan separados por empresa como corresponde
+    // declarar (cada una tiene su propio RUT). Si el archivo no trae la
+    // columna Empresa (ej. Tres Valles) o solo trae una, se usa el cliente
+    // ya seleccionado — mismo comportamiento que antes.
+    const rowEmpresa = r["Empresa - Nombre Empresa"] || cliente;
+    const rowClienteSlug = slugify(rowEmpresa);
     return {
-      clienteSlug, cliente, mes, mesLabel,
+      clienteSlug: rowClienteSlug, cliente: rowEmpresa, mes, mesLabel,
       fechaNacimiento: r["Colaborador - Fecha de Nacimiento"] == null ? null : r["Colaborador - Fecha de Nacimiento"],
       fechaIngreso: r["Trabajo - Fecha Ingreso Compañía"] == null ? null : r["Trabajo - Fecha Ingreso Compañía"],
       comuna: r["Colaborador - Comuna"] || "",
