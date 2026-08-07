@@ -663,7 +663,6 @@ async function handleFiles(fileList) {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
       // Se lee la planilla como matriz cruda (fila de encabezados + filas de
       // datos) y las filas se arman a mano usando el encabezado YA recortado
       // (trim) como llave de cada campo. Esto evita el problema de que
@@ -673,16 +672,29 @@ async function handleFiles(fileList) {
       // encabezado recortado y pasaba, pero la lectura de cada dato seguía
       // usando la llave cruda y no encontraba nada (todo salía en blanco/0).
       // Ahora encabezado y datos usan siempre la misma llave recortada.
-      const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
-      const headerRow = (aoa[0] || []).map((h) => (h == null ? "" : String(h).trim()));
-      const rows = aoa.slice(1).map((r) => {
-        const obj = {};
-        headerRow.forEach((h, idx) => {
-          if (!h) return;
-          const v = r[idx];
-          obj[h] = v === undefined ? null : v;
+      // Algunos clientes (ej. Filopulli, que agrupa varias razones sociales
+      // en un mismo archivo) traen MÁS DE UNA HOJA por libro, una por razón
+      // social/entidad legal, todas con el mismo encabezado. Para que el
+      // dashboard "junte todo" se recorren TODAS las hojas del libro y se
+      // concatenan sus filas en un solo listado; el encabezado de referencia
+      // se toma de la primera hoja no vacía.
+      let headerRow = [];
+      let rows = [];
+      wb.SheetNames.forEach((sn) => {
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: null, raw: true });
+        const sheetHeaderRow = (aoa[0] || []).map((h) => (h == null ? "" : String(h).trim()));
+        if (!sheetHeaderRow.some((h) => h)) return; // hoja vacía/sin encabezado, se ignora
+        if (!headerRow.length) headerRow = sheetHeaderRow;
+        const sheetRows = aoa.slice(1).map((r) => {
+          const obj = {};
+          sheetHeaderRow.forEach((h, idx) => {
+            if (!h) return;
+            const v = r[idx];
+            obj[h] = v === undefined ? null : v;
+          });
+          return obj;
         });
-        return obj;
+        rows = rows.concat(sheetRows);
       });
       // Un archivo de "bono reliquidado" es un export distinto (Reliquidaciones -
       // mes/Monto/Impuesto/...) que no trae dotación ni columnas de rol — se
@@ -735,8 +747,14 @@ function peekPeriod(rows, headerRow) {
   const mm = mesKeys[0].split("-")[1];
   // Si el archivo no trae "Empresa - Nombre Empresa" (ej. Tres Valles), se usa
   // el cliente ya seleccionado/creado en la barra lateral en vez de rechazar
-  // el archivo o agruparlo bajo un "Cliente" genérico.
-  return { cliente: empresas[0] || curClienteNombre || "Cliente", mes: mesKeys[0], mesLabel: MESES_ES[mm], n: clean.length };
+  // el archivo o agruparlo bajo un "Cliente" genérico. Si el archivo trae MÁS
+  // DE UNA empresa (ej. Filopulli, que junta varias razones sociales en un
+  // mismo HYD), tampoco corresponde tomar la primera al azar: se agrupa bajo
+  // el cliente ya seleccionado, igual que cuando falta la columna — así el
+  // preview y el guardado (computeMonthAggregate, misma regla) quedan bajo el
+  // mismo clienteSlug.
+  const cliente = (empresas.length === 1 ? empresas[0] : null) || curClienteNombre || empresas[0] || "Cliente";
+  return { cliente, mes: mesKeys[0], mesLabel: MESES_ES[mm], n: clean.length };
 }
 
 // Export "Reliquidaciones" (p.ej. bono anual reliquidado): trae Reliquidaciones -
@@ -1866,7 +1884,14 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
   const rows = readRows(rawRows, headerRow);
   if (!rows.length) throw new Error("No se encontró ningún período válido en el archivo.");
   const empresas = Array.from(new Set(rows.map((r) => r["Empresa - Nombre Empresa"]).filter(Boolean)));
-  const company = empresas[0] || curClienteNombre || "Cliente";
+  // Clientes como Filopulli combinan varias razones sociales en un mismo
+  // archivo/mes: si el archivo trae más de una empresa distinta, el nombre
+  // del "cliente" para la tarjeta/slug debe ser el que Piera seleccionó a
+  // la izquierda (curClienteNombre) — no una razón social cualquiera tomada
+  // al azar (antes se usaba siempre empresas[0], lo que podía hacer que el
+  // mismo cliente quedara guardado bajo un slug distinto cada mes según qué
+  // razón social apareciera primero en el archivo).
+  const company = (empresas.length === 1 ? empresas[0] : null) || curClienteNombre || empresas[0] || "Cliente";
   const periodos = rows.map((r) => toDate(r["Liquidación - Período"])).filter(Boolean);
   const mesKeys = Array.from(new Set(periodos.map(ymKey)));
   if (mesKeys.length > 1) throw new Error("Este archivo trae más de un período distinto (" + mesKeys.join(", ") + "). Sube un archivo por mes.");
@@ -1975,6 +2000,21 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
   let nIgualImm = 0, nEntre = 0, nSobre = 0;
   rows.forEach((r) => { const sb = num(r["Trabajo - Sueldo Base"]); if (sb <= imm) nIgualImm++; else if (sb < tramoUmbral) nEntre++; else nSobre++; });
 
+  // Desglose por razón social: cuando el archivo trae más de una empresa
+  // (ej. Filopulli), además del total combinado se calcula el mismo
+  // agregado para cada razón social por separado, reutilizando esta misma
+  // función sobre el subconjunto de filas de esa empresa. No se recorre
+  // más de un nivel (cada llamada recursiva ve una sola empresa, así que
+  // no vuelve a entrar aquí), y como readRows() es idempotente sobre filas
+  // ya filtradas, es seguro reprocesarlas.
+  let breakdown = null;
+  if (empresas.length > 1) {
+    breakdown = empresas.map((emp) => {
+      const subRawRows = rawRows.filter((r) => r["Empresa - Nombre Empresa"] === emp);
+      return { empresa: emp, agg: computeMonthAggregate(subRawRows, imm, tramoUmbral, meta, headerRow) };
+    });
+  }
+
   return {
     cliente: company, clienteSlug: slugify(company), mes, mesLabel: MESES_ES[mm], anio,
     dotacion, tipoContratoCounts, antiguedadPromAnios,
@@ -1983,6 +2023,7 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
     salarioLiquidoSum, salarioLiquidoCount, aportesPatronalesTotal, areaCounts,
     haberesTotal, haberesImponiblesTotal, haberesNoImponiblesTotal, impuestoUnicoTotal, areaCostoEmpresa,
     tramo: { imm, tramoUmbral, nIgualImm, nEntre, nSobre },
+    empresas, breakdown,
     sourceFile: meta.sourceFile || null, uploadedBy: meta.uploadedBy || null, uploadedAt: meta.uploadedAt || null,
   };
 }
@@ -2073,6 +2114,11 @@ function combineAggregates(list) {
     _licPorMes: licPorMes, _ausPorMes: ausPorMes, _licCasosPorMes: licCasosPorMes,
     _areasItems: areasItems, _areasCostoItems: areasCostoItems, _tramoItems: tramoItems,
     _apMmVals: apMmVals, _haberesMmVals: haberesMmVals,
+    // Desglose por razón social del mes de corte (el más reciente de los
+    // meses seleccionados) — solo viene poblado para clientes que combinan
+    // varias razones sociales en un mismo archivo/mes (ej. Filopulli); para
+    // el resto de los clientes queda null y no cambia nada del reporte.
+    breakdown_cutoff: cutoff.breakdown,
   };
 }
 
@@ -2369,8 +2415,21 @@ function renderDashboardHTML(pieces, logoSvg) {
   } else {
     finiquitoDesc = "No se registraron desvinculaciones ni finiquitos en el período informado. Este indicador se calcula a partir de la fecha de término de contrato registrada en el HYD de cada mes; si en un período futuro se registra una desvinculación, el dashboard reportará automáticamente la cantidad y el motivo asociado.";
   }
-  let remuneracionesPage = "", page1Of = "1 / 2", page2Of = "2 / 2";
-  if (d.total_haberes_periodo != null || d.total_aportes_periodo != null) {
+  // Numeración de páginas dinámica: siempre hay 2 páginas base (resumen +
+  // composición de dotación), más la página de remuneraciones si el HYD
+  // trae esos datos, más la página de desglose por razón social si el
+  // cliente combina varias razones sociales en un mismo reporte (ej.
+  // Filopulli) — el orden es fijo (remuneraciones antes que desglose) pero
+  // cualquiera de las dos puede faltar sin romper la numeración del resto.
+  let pageCount = 2;
+  const hasRemuneraciones = d.total_haberes_periodo != null || d.total_aportes_periodo != null;
+  const hasBreakdown = d.breakdown_cutoff && d.breakdown_cutoff.length > 1;
+  let remuneracionesPageNum = null, desglosePageNum = null;
+  if (hasRemuneraciones) { pageCount++; remuneracionesPageNum = pageCount; }
+  if (hasBreakdown) { pageCount++; desglosePageNum = pageCount; }
+  const page1Of = `1 / ${pageCount}`, page2Of = `2 / ${pageCount}`;
+  let remuneracionesPage = "";
+  if (hasRemuneraciones) {
     let exclNoteAportes = "";
     if (d.aportes_meses_excluidos.length) exclNoteAportes = ` (no incluye ${d.aportes_meses_excluidos.join(", ")}, meses sin esa información en el HYD entregado)`;
     let exclNoteHaberes = "";
@@ -2401,9 +2460,50 @@ function renderDashboardHTML(pieces, logoSvg) {
     <div class="section"><div class="section-title">Aportes patronales por mes</div><div class="section-sub">Millones de pesos ($ MM) pagados por la empresa</div><div class="card">${aportesChartBlock}</div></div>
   </div>
   <div class="footer"><span>Capital Humano &mdash; Cliente ${esc2(company)}</span><span>Información agregada y anonimizada.</span></div>
-  <div class="pagenum" style="position:absolute; bottom:5mm; right:14mm;">3 / 3</div>
+  <div class="pagenum" style="position:absolute; bottom:5mm; right:14mm;">${remuneracionesPageNum} / ${pageCount}</div>
 </div>`;
-    page1Of = "1 / 3"; page2Of = "2 / 3";
+  }
+  // Página extra solo para clientes que combinan varias razones sociales en
+  // un mismo reporte (ej. Filopulli): muestra el mismo corte del mes más
+  // reciente pero separado por razón social, para que Piera pueda revisar
+  // cada entidad además del total ya combinado en las páginas anteriores.
+  let desglosePage = "";
+  if (hasBreakdown) {
+    const filasHtml = d.breakdown_cutoff.map(({ empresa, agg }) => {
+      const liqProm = agg.salarioLiquidoCount ? agg.salarioLiquidoSum / agg.salarioLiquidoCount : null;
+      return `<tr>
+        <td style="padding:7px 4px; border-bottom:1px solid #ecebe6;">${esc2(empresa)}</td>
+        <td style="padding:7px 4px; border-bottom:1px solid #ecebe6; text-align:right;">${fmt(agg.dotacion)}</td>
+        <td style="padding:7px 4px; border-bottom:1px solid #ecebe6; text-align:right;">${liqProm != null ? fmtClp(liqProm) : "—"}</td>
+        <td style="padding:7px 4px; border-bottom:1px solid #ecebe6; text-align:right;">${agg.haberesTotal != null ? fmtClp(agg.haberesTotal) : "—"}</td>
+        <td style="padding:7px 4px; border-bottom:1px solid #ecebe6; text-align:right;">${agg.aportesPatronalesTotal != null ? fmtClp(agg.aportesPatronalesTotal) : "—"}</td>
+      </tr>`;
+    }).join("");
+    desglosePage = `
+<div class="page">
+  <div class="header">
+    <div><div class="brand">Capital Humano</div><h1>${esc2(company)}</h1><div class="sub">Desglose por razón social &middot; Corte ${corte}</div></div>
+    <div class="meta-block">${logoTag}<div class="meta"><div>Período reportado: <b>${periodo}</b></div></div></div>
+  </div>
+  <div class="section">
+    <div class="section-title">Detalle por razón social</div>
+    <div class="section-sub">Este cliente agrupa ${d.breakdown_cutoff.length} razones sociales en un solo reporte. Los totales de las páginas anteriores ya suman a todas; esta página las muestra por separado, con el corte del mes más reciente informado (${corte}).</div>
+    <div class="card">
+      <table style="width:100%; border-collapse:collapse; font-size:11px;">
+        <thead><tr>
+          <th style="text-align:left; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Razón social</th>
+          <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Dotación</th>
+          <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Sueldo líquido prom.</th>
+          <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Total haberes</th>
+          <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Aportes patronales</th>
+        </tr></thead>
+        <tbody>${filasHtml}</tbody>
+      </table>
+    </div>
+  </div>
+  <div class="footer"><span>Capital Humano &mdash; Cliente ${esc2(company)}</span><span>Información agregada y anonimizada.</span></div>
+  <div class="pagenum" style="position:absolute; bottom:5mm; right:14mm;">${desglosePageNum} / ${pageCount}</div>
+</div>`;
   }
   return `<!DOCTYPE html>
 <html lang="es">
@@ -2499,6 +2599,7 @@ ${areasSection}
   <div class="pagenum" style="position:absolute; bottom:5mm; right:14mm;">${page2Of}</div>
 </div>
 ${remuneracionesPage}
+${desglosePage}
 </body>
 </html>`;
 }
@@ -2600,13 +2701,23 @@ async function handleDj1887Files(fileList) {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
-      const headerRow = (aoa[0] || []).map((h) => (h == null ? "" : String(h).trim()));
-      const rows = aoa.slice(1).map((r) => {
-        const obj = {};
-        headerRow.forEach((h, idx) => { if (!h) return; const v = r[idx]; obj[h] = v === undefined ? null : v; });
-        return obj;
+      // Igual que en handleFiles(): algunos clientes (Filopulli) traen varias
+      // hojas por libro (una por razón social), todas con el mismo
+      // encabezado — se combinan todas para que el DJ 1887 tampoco pierda
+      // colaboradores de ninguna entidad.
+      let headerRow = [];
+      let rows = [];
+      wb.SheetNames.forEach((sn) => {
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: null, raw: true });
+        const sheetHeaderRow = (aoa[0] || []).map((h) => (h == null ? "" : String(h).trim()));
+        if (!sheetHeaderRow.some((h) => h)) return;
+        if (!headerRow.length) headerRow = sheetHeaderRow;
+        const sheetRows = aoa.slice(1).map((r) => {
+          const obj = {};
+          sheetHeaderRow.forEach((h, idx) => { if (!h) return; const v = r[idx]; obj[h] = v === undefined ? null : v; });
+          return obj;
+        });
+        rows = rows.concat(sheetRows);
       });
       // Un archivo de "bono reliquidado" no aplica acá (DJ 1887 usa solo los
       // archivos de rol), así que se sintetiza el período siempre que falte.
