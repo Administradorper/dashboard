@@ -621,6 +621,9 @@ const HYD_COLUMN_SYNONYMS = {
   // Tres Valles no trae ninguna columna "Trabajo - ..." en su export de BUK;
   // el sueldo base aparece igual, solo que catalogado como un haber imponible.
   "Trabajo - Sueldo Base": ["Haberes Imponibles - Sueldo Base"],
+  // BBR llama a los días de ausencia "Días de Ausencias (Aplicadas)" en vez de
+  // "Días Ausencias" — mismo dato, mismo patrón que Licencias arriba.
+  "Liquidación - Días Ausencias": ["Liquidación - Días de Ausencias (Aplicadas)"],
 };
 function applyHydColumnSynonyms(headerRow, rows) {
   for (const canonical in HYD_COLUMN_SYNONYMS) {
