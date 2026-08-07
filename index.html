@@ -283,6 +283,14 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:5px;backgroun
               <div id="auditoriaIaResult"></div>
             </div>
           </div>
+
+          <div class="panel">
+            <h2>Alertas por razón social</h2>
+            <div class="hint" id="empresaAlertsHint">Elige un cliente a la izquierda para ver sus alertas por razón social.</div>
+            <div class="hint">Para clientes que agrupan varias razones sociales en un mismo HYD (ej. Filopulli, Torca, Conferre), las alertas de arriba comparan el archivo de auditoría <b>combinado</b> — si una razón social sube y otra baja al mismo tiempo, se pueden cancelar entre sí y no salir ninguna alerta. Esta sección compara <b>cada razón social por separado</b>, mes a mes, usando los datos del HYD (que sí distingue cada una).</div>
+            <div id="empresaAlertsList"></div>
+            <button class="btn btn-sec btn-sm" id="btnDescargarAlertasEmpresaExcel" disabled style="margin-top:12px;width:auto;"><i class="fas fa-file-excel"></i> Descargar tabla de alertas por razón social (Excel)</button>
+          </div>
         </div>
 
         <div id="viewDj1887" style="display:none">
@@ -492,7 +500,7 @@ function listen() {
         else meses.push(data);
       });
       renderClientList();
-      if (curClienteSlug) renderMonthList();
+      if (curClienteSlug) { renderMonthList(); renderEmpresaAlerts(); }
     },
     (err) => {
       console.error("Error en la conexión en tiempo real:", err);
@@ -512,7 +520,7 @@ function startPolling() {
       snap.forEach((d) => fresh.push(d.data()));
       meses = fresh;
       renderClientList();
-      if (curClienteSlug) renderMonthList();
+      if (curClienteSlug) { renderMonthList(); renderEmpresaAlerts(); }
       setSyncState(true);
     } catch (e) {
       console.error("Error en la actualización periódica:", e);
@@ -976,6 +984,7 @@ async function saveMonthGroup(groupKey) {
     if (!curClienteSlug) { curClienteSlug = agg.clienteSlug; curClienteNombre = agg.cliente; }
     renderClientList();
     renderMonthList();
+    renderEmpresaAlerts();
     return true;
   } catch (e) {
     console.error(e);
@@ -1029,6 +1038,7 @@ function renderMonthList() {
       renderClientList();
       renderMonthList();
       clearDashboard();
+      renderEmpresaAlerts();
     } catch (e) {
       console.error(e);
       toast("No se pudo eliminar: " + e.message, "warn");
@@ -1255,6 +1265,7 @@ function refreshAuditoriaClientUI() {
     zoneEl.style.display = "";
   }
   renderAuditoriaAlerts();
+  renderEmpresaAlerts();
 }
 
 // ----------------------------------------------------------------------
@@ -1571,6 +1582,218 @@ function renderAuditoriaAlerts() {
   }).join("");
   updateIaButtonState(alerts.length);
 }
+
+// ----------------------------------------------------------------------
+// Alertas por razón social (a pedido de Piera, tras Filopulli/Torca/Conferre):
+// las alertas de arriba comparan el "Resumen de Procesos para auditoría" de
+// BUK, que viene agregado a nivel de CLIENTE completo — no distingue razón
+// social porque el archivo de origen no la trae. Para clientes que agrupan
+// varias razones sociales en un mismo HYD, un problema real en una razón
+// social se puede cancelar en el total combinado si otra razón social se
+// mueve al revés el mismo mes, y no generar ninguna alerta.
+//
+// Esta sección usa en cambio los datos del HYD ya guardados (cada mes de
+// `meses` trae `breakdown: [{empresa, agg}, ...]` cuando el archivo tenía
+// más de una empresa — ver computeMonthAggregate) y compara cada razón
+// social contra el mismo mes anterior, igual que las alertas de auditoría:
+//  1) una razón social aparece o desaparece de un mes a otro
+//  2) su dotación cambia fuerte (≥15% y al menos 1 persona)
+//  3) su total de haberes cambia fuerte (≥20%)
+//  4) su sueldo líquido promedio cambia fuerte (≥15%)
+// Umbrales de partida, igual que en las alertas de auditoría — se pueden
+// ajustar si en la práctica salen muchas alertas de poca importancia (o
+// muy pocas).
+// ----------------------------------------------------------------------
+
+const EMPRESA_HABERES_PCT = 0.20, EMPRESA_SUELDO_PCT = 0.15, EMPRESA_DOTACION_PCT = 0.15;
+
+// Arma un mapa razón social -> {dotacion, haberesTotal, sueldoLiquidoProm}
+// para un mes guardado. Si ese mes no trae breakdown (por ejemplo, quedó
+// con una sola empresa ese mes puntual), se usa el agregado combinado del
+// mes como si fuera su única "razón social" — así la comparación no se
+// corta por un mes suelto sin breakdown.
+function empresaBreakdownMap(doc) {
+  const map = {};
+  const promedio = (agg) => (agg.salarioLiquidoCount ? agg.salarioLiquidoSum / agg.salarioLiquidoCount : null);
+  if (doc.breakdown && doc.breakdown.length) {
+    doc.breakdown.forEach(({ empresa, agg }) => {
+      map[empresa] = { dotacion: agg.dotacion, haberesTotal: agg.haberesTotal, sueldoLiquidoProm: promedio(agg) };
+    });
+  } else if (doc.empresas && doc.empresas.length === 1) {
+    map[doc.empresas[0]] = { dotacion: doc.dotacion, haberesTotal: doc.haberesTotal, sueldoLiquidoProm: promedio(doc) };
+  }
+  return map;
+}
+
+function computeEmpresaAlerts(sortedMonthDocs) {
+  const alerts = [];
+  for (let i = 1; i < sortedMonthDocs.length; i++) {
+    const prev = sortedMonthDocs[i - 1], curr = sortedMonthDocs[i];
+    const prevMap = empresaBreakdownMap(prev), currMap = empresaBreakdownMap(curr);
+    const allKeys = new Set([...Object.keys(prevMap), ...Object.keys(currMap)]);
+    const prevLabel = `${prev.mesLabel} ${prev.anio}`;
+    allKeys.forEach((empresa) => {
+      const p = prevMap[empresa], c = currMap[empresa];
+      if (!p && c) {
+        alerts.push({ tipo: "aparecio", mes: curr.mes, mesLabel: curr.mesLabel, anio: curr.anio, empresa,
+          mesAnteriorLabel: prevLabel, dotacionAnterior: null, dotacionActual: c.dotacion,
+          haberesAnterior: null, haberesActual: c.haberesTotal, sueldoAnterior: null, sueldoActual: c.sueldoLiquidoProm,
+          variacionPct: null,
+          desc: `"${empresa}" es una razón social nueva este mes — no aparecía en ${prevLabel}. ${c.dotacion} colaborador(es), ${fmtClp(c.haberesTotal)}.` });
+        return;
+      }
+      if (p && !c) {
+        alerts.push({ tipo: "desaparecio", mes: curr.mes, mesLabel: curr.mesLabel, anio: curr.anio, empresa,
+          mesAnteriorLabel: prevLabel, dotacionAnterior: p.dotacion, dotacionActual: null,
+          haberesAnterior: p.haberesTotal, haberesActual: null, sueldoAnterior: p.sueldoLiquidoProm, sueldoActual: null,
+          variacionPct: null,
+          desc: `"${empresa}" desapareció este mes — en ${prevLabel} tenía ${p.dotacion} colaborador(es), ${fmtClp(p.haberesTotal)}.` });
+        return;
+      }
+      const diffDot = c.dotacion - p.dotacion;
+      const pctDot = p.dotacion !== 0 ? Math.abs(diffDot) / p.dotacion : (c.dotacion !== 0 ? 1 : 0);
+      if (diffDot !== 0 && pctDot >= EMPRESA_DOTACION_PCT) {
+        alerts.push({ tipo: "dotacion", mes: curr.mes, mesLabel: curr.mesLabel, anio: curr.anio, empresa,
+          mesAnteriorLabel: prevLabel, dotacionAnterior: p.dotacion, dotacionActual: c.dotacion,
+          haberesAnterior: p.haberesTotal, haberesActual: c.haberesTotal, sueldoAnterior: p.sueldoLiquidoProm, sueldoActual: c.sueldoLiquidoProm,
+          variacionPct: diffDot >= 0 ? pctDot : -pctDot,
+          desc: `La dotación de "${empresa}" pasó de ${p.dotacion} a ${c.dotacion} colaborador(es) (${diffDot >= 0 ? "+" : ""}${diffDot}) respecto a ${prevLabel}.` });
+      }
+      if (p.haberesTotal != null && c.haberesTotal != null) {
+        const diffHab = c.haberesTotal - p.haberesTotal;
+        const pctHab = p.haberesTotal !== 0 ? Math.abs(diffHab) / Math.abs(p.haberesTotal) : (c.haberesTotal !== 0 ? 1 : 0);
+        if (pctHab >= EMPRESA_HABERES_PCT) {
+          alerts.push({ tipo: "haberes", mes: curr.mes, mesLabel: curr.mesLabel, anio: curr.anio, empresa,
+            mesAnteriorLabel: prevLabel, dotacionAnterior: p.dotacion, dotacionActual: c.dotacion,
+            haberesAnterior: p.haberesTotal, haberesActual: c.haberesTotal, sueldoAnterior: p.sueldoLiquidoProm, sueldoActual: c.sueldoLiquidoProm,
+            variacionPct: diffHab >= 0 ? pctHab : -pctHab,
+            desc: `El total de haberes de "${empresa}" pasó de ${fmtClp(p.haberesTotal)} a ${fmtClp(c.haberesTotal)} (${diffHab >= 0 ? "+" : ""}${fmt(pctHab * 100, 1)}%) respecto a ${prevLabel}.` });
+        }
+      }
+      if (p.sueldoLiquidoProm != null && c.sueldoLiquidoProm != null) {
+        const diffSl = c.sueldoLiquidoProm - p.sueldoLiquidoProm;
+        const pctSl = p.sueldoLiquidoProm !== 0 ? Math.abs(diffSl) / Math.abs(p.sueldoLiquidoProm) : (c.sueldoLiquidoProm !== 0 ? 1 : 0);
+        if (pctSl >= EMPRESA_SUELDO_PCT) {
+          alerts.push({ tipo: "sueldo", mes: curr.mes, mesLabel: curr.mesLabel, anio: curr.anio, empresa,
+            mesAnteriorLabel: prevLabel, dotacionAnterior: p.dotacion, dotacionActual: c.dotacion,
+            haberesAnterior: p.haberesTotal, haberesActual: c.haberesTotal, sueldoAnterior: p.sueldoLiquidoProm, sueldoActual: c.sueldoLiquidoProm,
+            variacionPct: diffSl >= 0 ? pctSl : -pctSl,
+            desc: `El sueldo líquido promedio de "${empresa}" pasó de ${fmtClp(p.sueldoLiquidoProm)} a ${fmtClp(c.sueldoLiquidoProm)} (${diffSl >= 0 ? "+" : ""}${fmt(pctSl * 100, 1)}%) respecto a ${prevLabel}.` });
+        }
+      }
+    });
+  }
+  alerts.sort((a, b) => b.mes.localeCompare(a.mes));
+  return alerts;
+}
+
+const EMPRESA_TYPE_META = {
+  desaparecio: { cls: "t-desaparecio", icon: "fa-circle-minus", label: "Razón social desapareció" },
+  aparecio: { cls: "t-aparecio", icon: "fa-circle-plus", label: "Razón social nueva" },
+  dotacion: { cls: "t-cantidad", icon: "fa-users", label: "Cambio de dotación" },
+  haberes: { cls: "t-monto", icon: "fa-money-bill-trend-up", label: "Cambio de haberes" },
+  sueldo: { cls: "t-monto", icon: "fa-sack-dollar", label: "Cambio de sueldo líquido promedio" },
+};
+
+function updateEmpresaExcelButtonState(nAlerts) {
+  const btn = document.getElementById("btnDescargarAlertasEmpresaExcel");
+  if (!btn) return;
+  const n = typeof nAlerts === "number" ? nAlerts : document.querySelectorAll("#empresaAlertsList .alert-card").length;
+  btn.disabled = !curClienteSlug || n === 0;
+}
+
+function renderEmpresaAlerts() {
+  const hint = document.getElementById("empresaAlertsHint");
+  const list = document.getElementById("empresaAlertsList");
+  if (!hint || !list) return;
+  if (!curClienteSlug) {
+    hint.textContent = "Elige un cliente a la izquierda para ver sus alertas por razón social.";
+    list.innerHTML = "";
+    updateEmpresaExcelButtonState(0);
+    return;
+  }
+  const nombre = curClienteNombre || curClienteSlug;
+  const docs = meses.filter((m) => m.clienteSlug === curClienteSlug).sort((a, b) => a.mes.localeCompare(b.mes));
+  const esMultiEmpresa = docs.some((d) => (d.empresas && d.empresas.length > 1) || (d.breakdown && d.breakdown.length > 1));
+  if (!esMultiEmpresa) {
+    hint.textContent = docs.length
+      ? `${nombre} no agrupa varias razones sociales en el HYD — esta vista es solo para clientes tipo Filopulli, Torca o Conferre.`
+      : `${nombre} todavía no tiene ningún HYD cargado.`;
+    list.innerHTML = "";
+    updateEmpresaExcelButtonState(0);
+    return;
+  }
+  if (docs.length < 2) {
+    hint.textContent = `${nombre} tiene solo 1 mes cargado — sube al menos un segundo mes para poder comparar y generar alertas por razón social.`;
+    list.innerHTML = "";
+    updateEmpresaExcelButtonState(0);
+    return;
+  }
+  const alerts = computeEmpresaAlerts(docs);
+  hint.textContent = `${nombre} — ${docs.length} meses cargados. ${alerts.length} alerta(s) detectada(s) comparando cada razón social mes a mes.`;
+  if (!alerts.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fas fa-circle-check"></i>Sin alertas — no se detectaron cambios grandes por razón social entre meses consecutivos.</div>';
+    updateEmpresaExcelButtonState(0);
+    return;
+  }
+  const byMonth = {}; const order = [];
+  alerts.forEach((al) => {
+    if (!byMonth[al.mes]) { byMonth[al.mes] = []; order.push(al.mes); }
+    byMonth[al.mes].push(al);
+  });
+  list.innerHTML = order.map((mes) => {
+    const items = byMonth[mes];
+    const cardsHtml = items.map((al) => {
+      const meta = EMPRESA_TYPE_META[al.tipo];
+      return `<div class="alert-card ${meta.cls}">
+        <div class="a-ic"><i class="fas ${meta.icon}"></i></div>
+        <div class="a-body">
+          <div class="a-title">${esc(meta.label)} — ${esc(al.empresa)}</div>
+          <div class="a-desc">${esc(al.desc)}</div>
+        </div>
+      </div>`;
+    }).join("");
+    return `<div class="alert-month-group">${esc(items[0].mesLabel)} ${mes.slice(0,4)}</div>${cardsHtml}`;
+  }).join("");
+  updateEmpresaExcelButtonState(alerts.length);
+}
+
+function buildEmpresaAlertsExportRows() {
+  if (!curClienteSlug) return null;
+  const docs = meses.filter((m) => m.clienteSlug === curClienteSlug).sort((a, b) => a.mes.localeCompare(b.mes));
+  const alerts = computeEmpresaAlerts(docs).sort((a, b) => a.mes.localeCompare(b.mes));
+  if (!alerts.length) return null;
+  return alerts.map((al) => ({
+    "Mes": `${al.mesLabel} ${al.anio}`,
+    "Tipo de alerta": EMPRESA_TYPE_META[al.tipo].label,
+    "Razón social": al.empresa,
+    "Mes de comparación": al.mesAnteriorLabel,
+    "Dotación anterior": al.dotacionAnterior,
+    "Dotación actual": al.dotacionActual,
+    "Haberes anterior (CLP)": al.haberesAnterior,
+    "Haberes actual (CLP)": al.haberesActual,
+    "Sueldo líquido prom. anterior (CLP)": al.sueldoAnterior != null ? Math.round(al.sueldoAnterior) : null,
+    "Sueldo líquido prom. actual (CLP)": al.sueldoActual != null ? Math.round(al.sueldoActual) : null,
+    "Variación %": al.variacionPct != null ? Math.round(al.variacionPct * 1000) / 10 : null,
+    "Descripción": al.desc,
+  }));
+}
+window.buildEmpresaAlertsExportRows = buildEmpresaAlertsExportRows;
+
+function descargarAlertasEmpresaExcel() {
+  if (!curClienteSlug) { toast("Elige un cliente primero.", "warn"); return; }
+  const nombre = curClienteNombre || curClienteSlug;
+  const filas = buildEmpresaAlertsExportRows();
+  if (!filas) { toast("No hay alertas por razón social para exportar.", "warn"); return; }
+  const ws = XLSX.utils.json_to_sheet(filas);
+  ws["!cols"] = [{ wch: 12 }, { wch: 22 }, { wch: 40 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 70 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Alertas por razón social");
+  const fecha = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `alertas_razon_social_${slugify(nombre)}_${fecha}.xlsx`);
+  toast("Excel descargado.");
+}
+document.getElementById("btnDescargarAlertasEmpresaExcel").addEventListener("click", descargarAlertasEmpresaExcel);
 
 // ----------------------------------------------------------------------
 // "Analizar con IA": experto en remuneraciones que explica las alertas de
