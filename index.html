@@ -1320,6 +1320,15 @@ const AUDIT_REQUIRED_COLS = ["item","cantidad de asignaciones","haberes imponibl
 //     seguro cesantía, aportes patronales, etc.), sin importar el cliente.
 const AUDIT_EXCLUDED_CONCEPTOS = ["sueldo liquido", "deposito convenido", "bono anual", "bonos ejecutivos"];
 const AUDIT_EXCLUDED_CONCEPTO_SUBSTRINGS = ["reliquidaci"];
+// Se usa tanto al parsear un archivo nuevo (parseAuditoriaAOA, para no
+// guardar estos conceptos en Firestore) como al comparar meses ya guardados
+// (computeAuditAlerts, para que los meses subidos ANTES de este cambio con
+// una versión anterior de la app — que sí guardó estos conceptos — también
+// queden excluidos de las alertas sin tener que volver a subir el archivo).
+function isExcludedAuditConcepto(nombre) {
+  const n = normAcc(nombre);
+  return AUDIT_EXCLUDED_CONCEPTOS.includes(n) || AUDIT_EXCLUDED_CONCEPTO_SUBSTRINGS.some((s) => n.includes(s));
+}
 
 function parseAuditoriaAOA(aoa) {
   let headerIdx = -1, colIdx = null;
@@ -1345,8 +1354,7 @@ function parseAuditoriaAOA(aoa) {
     const nombre = g(row, "item");
     if (nombre == null || String(nombre).trim() === "") continue;
     const nombreNorm = normAcc(nombre);
-    if (AUDIT_EXCLUDED_CONCEPTOS.includes(nombreNorm)) continue;
-    if (AUDIT_EXCLUDED_CONCEPTO_SUBSTRINGS.some((s) => nombreNorm.includes(s))) continue;
+    if (isExcludedAuditConcepto(nombre)) continue;
     const rec = {
       nombre: String(nombre).trim(),
       cantidadAsignaciones: num(g(row, "cantidad de asignaciones")),
@@ -1499,8 +1507,11 @@ function computeAuditAlerts(sortedMonthDocs) {
   const alerts = [];
   for (let i = 1; i < sortedMonthDocs.length; i++) {
     const prev = sortedMonthDocs[i - 1], curr = sortedMonthDocs[i];
-    const prevByName = {}; (prev.conceptos || []).forEach((c) => { prevByName[normAcc(c.nombre)] = c; });
-    const currByName = {}; (curr.conceptos || []).forEach((c) => { currByName[normAcc(c.nombre)] = c; });
+    // Se vuelve a filtrar acá (además de en parseAuditoriaAOA) para que los
+    // meses guardados en Firestore ANTES de este cambio también queden
+    // excluidos de las alertas, sin necesidad de volver a subir el archivo.
+    const prevByName = {}; (prev.conceptos || []).filter((c) => !isExcludedAuditConcepto(c.nombre)).forEach((c) => { prevByName[normAcc(c.nombre)] = c; });
+    const currByName = {}; (curr.conceptos || []).filter((c) => !isExcludedAuditConcepto(c.nombre)).forEach((c) => { currByName[normAcc(c.nombre)] = c; });
     const allKeys = new Set([...Object.keys(prevByName), ...Object.keys(currByName)]);
     allKeys.forEach((key) => {
       const p = prevByName[key], c = currByName[key];
