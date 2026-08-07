@@ -1300,7 +1300,23 @@ const AUDIT_REQUIRED_COLS = ["item","cantidad de asignaciones","haberes imponibl
 // mismo monto en las 3 columnas).
 const AUDIT_EXCLUDED_CONCEPTOS = ["sueldo liquido", "deposito convenido"];
 
-function parseAuditoriaAOA(aoa) {
+// Algunos clientes tienen conceptos puntuales que no deben compararse mes a
+// mes como el resto (a diferencia de AUDIT_EXCLUDED_CONCEPTOS arriba, que
+// aplica siempre a todos los clientes). Ej: Transelec tuvo en marzo-2026 un
+// bono reliquidado por el año 2025 que aparece en el resumen de auditoría
+// como "Bonos Ejecutivos" e "Impuesto por Reliquidación" — es un evento
+// puntual/retroactivo (no una remuneración mensual normal), así que para
+// ESTE cliente se excluyen de las alertas para que no dispare "concepto
+// nuevo" en marzo y "concepto desapareció" en abril (a pedido de Piera).
+// OJO: "Impuesto por Reliquidación" es un concepto legítimo y normal para
+// otros clientes (ej. Vivo Spa también lo trae por su propio Bono Anual, y
+// ahí SÍ debe seguir alertando) — por eso esto va por cliente y no en la
+// lista global de arriba.
+const AUDIT_EXCLUDED_CONCEPTOS_BY_CLIENT = {
+  "transelec": ["bonos ejecutivos", "impuesto por reliquidacion"],
+};
+
+function parseAuditoriaAOA(aoa, clienteSlug) {
   let headerIdx = -1, colIdx = null;
   for (let i = 0; i < aoa.length; i++) {
     const row = aoa[i] || [];
@@ -1317,6 +1333,7 @@ function parseAuditoriaAOA(aoa) {
   if (missing.length) throw new Error("Faltan columnas esenciales en el resumen de auditoría: " + missing.join(", "));
   const hasSobregiro = "sobregiro" in colIdx;
   const g = (row, key) => { const idx = colIdx[key]; return idx == null ? null : row[idx]; };
+  const excluidosCliente = (clienteSlug && AUDIT_EXCLUDED_CONCEPTOS_BY_CLIENT[clienteSlug]) || [];
   const conceptos = [];
   let totales = null;
   for (let i = headerIdx + 1; i < aoa.length; i++) {
@@ -1324,7 +1341,7 @@ function parseAuditoriaAOA(aoa) {
     const nombre = g(row, "item");
     if (nombre == null || String(nombre).trim() === "") continue;
     const nombreNorm = normAcc(nombre);
-    if (AUDIT_EXCLUDED_CONCEPTOS.includes(nombreNorm)) continue;
+    if (AUDIT_EXCLUDED_CONCEPTOS.includes(nombreNorm) || excluidosCliente.includes(nombreNorm)) continue;
     const rec = {
       nombre: String(nombre).trim(),
       cantidadAsignaciones: num(g(row, "cantidad de asignaciones")),
@@ -1360,7 +1377,7 @@ async function handleAuditoriaFiles(fileList) {
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
-      const parsed = parseAuditoriaAOA(aoa);
+      const parsed = parseAuditoriaAOA(aoa, curClienteSlug);
       const periodo = parseMesFromFilename(file.name);
       if (!periodo) throw new Error('No se pudo detectar el mes desde el nombre del archivo. Verifica que incluya el mes y el año (ej: "Resumen de Procesos para auditoría abril 2026.xls").');
       pendingAuditFiles.push({
