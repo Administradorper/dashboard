@@ -1330,7 +1330,26 @@ function isExcludedAuditConcepto(nombre) {
   return AUDIT_EXCLUDED_CONCEPTOS.includes(n) || AUDIT_EXCLUDED_CONCEPTO_SUBSTRINGS.some((s) => n.includes(s));
 }
 
-function parseAuditoriaAOA(aoa) {
+// Además de excluir por nombre (arriba), BUK/la liquidadora a veces resalta
+// en rojo, dentro del propio archivo de auditoría, las filas de un mes
+// puntual que corresponden a un evento retroactivo (el bono reliquidado y
+// los conceptos que arrastra) — es un aviso visual para quien revisa el
+// archivo a mano. Aprovechamos esa misma marca al parsear: cualquier fila
+// cuyo "Ítem" tenga relleno rojo se excluye igual que "Bono Anual" o "...por
+// Reliquidación", SIN necesitar que el nombre del concepto siga ningún
+// patrón fijo (a pedido de Piera, tras revisar abril-2026 de Vivo Spa: el
+// archivo traía "Seguro Cesantía Empleador" — un concepto normal y
+// recurrente todos los meses — marcado en rojo ese mes puntual porque parte
+// de su monto corresponde al bono; excluirlo por nombre de forma global
+// habría ocultado sus alertas legítimas en el resto de los meses).
+function isRedFillCell(sheet, r, c) {
+  if (!sheet || r == null || c == null) return false;
+  const cell = sheet[XLSX.utils.encode_cell({ r, c })];
+  const rgb = cell && cell.s && cell.s.fgColor && cell.s.fgColor.rgb;
+  return !!rgb && /ff0000$/i.test(rgb);
+}
+
+function parseAuditoriaAOA(aoa, sheet) {
   let headerIdx = -1, colIdx = null;
   for (let i = 0; i < aoa.length; i++) {
     const row = aoa[i] || [];
@@ -1348,6 +1367,7 @@ function parseAuditoriaAOA(aoa) {
   const hasSobregiro = "sobregiro" in colIdx;
   const g = (row, key) => { const idx = colIdx[key]; return idx == null ? null : row[idx]; };
   const conceptos = [];
+  const excludedRed = [];
   let totales = null;
   for (let i = headerIdx + 1; i < aoa.length; i++) {
     const row = aoa[i] || [];
@@ -1355,6 +1375,7 @@ function parseAuditoriaAOA(aoa) {
     if (nombre == null || String(nombre).trim() === "") continue;
     const nombreNorm = normAcc(nombre);
     if (isExcludedAuditConcepto(nombre)) continue;
+    if (nombreNorm !== "total" && isRedFillCell(sheet, i, colIdx["item"])) { excludedRed.push(String(nombre).trim()); continue; }
     const rec = {
       nombre: String(nombre).trim(),
       cantidadAsignaciones: num(g(row, "cantidad de asignaciones")),
@@ -1373,8 +1394,12 @@ function parseAuditoriaAOA(aoa) {
     conceptos.push(rec);
   }
   if (!totales) throw new Error('No se encontró la fila "Total" en este archivo.');
-  return { conceptos, totales };
+  return { conceptos, totales, excludedRed };
 }
+// Expuesta para que el QA (que corre en el contexto global de la página)
+// pueda probar directamente la exclusión por color de celda sin tener que
+// pasar por todo el flujo de subida de archivo + stub de tamaño de bytes.
+window.parseAuditoriaAOA = parseAuditoriaAOA;
 
 // Monto total de un concepto (todo lo que suma a la liquidación, sin contar
 // el sueldo líquido que es un resultado derivado, no un componente aparte).
@@ -1387,17 +1412,19 @@ async function handleAuditoriaFiles(fileList) {
   for (const file of Array.from(fileList)) {
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      // cellStyles:true para poder leer el relleno de color de cada celda
+      // (ver isRedFillCell) — sin esto, XLSX.read no trae la info de estilo.
+      const wb = XLSX.read(buf, { type: "array", cellDates: true, cellStyles: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
-      const parsed = parseAuditoriaAOA(aoa);
+      const parsed = parseAuditoriaAOA(aoa, sheet);
       const periodo = parseMesFromFilename(file.name);
       if (!periodo) throw new Error('No se pudo detectar el mes desde el nombre del archivo. Verifica que incluya el mes y el año (ej: "Resumen de Procesos para auditoría abril 2026.xls").');
       pendingAuditFiles.push({
         file, error: null,
         clienteSlug: curClienteSlug, cliente: curClienteNombre || curClienteSlug,
         mes: periodo.mes, mesLabel: periodo.mesLabel, anio: periodo.anio,
-        conceptos: parsed.conceptos, totales: parsed.totales,
+        conceptos: parsed.conceptos, totales: parsed.totales, excludedRed: parsed.excludedRed,
       });
     } catch (e) {
       pendingAuditFiles.push({ file, error: e.message });
@@ -1426,8 +1453,15 @@ function renderAuditoriaFileRows() {
     const items = groups[mes];
     const entry = items[items.length - 1]; // si se sube 2 veces el mismo mes, se usa el último
     const filesListHtml = items.map((e) => `<div class="fname" style="font-size:11.5px;font-weight:400;"><i class="fas fa-file-excel"></i> ${esc(e.file.name)}</div>`).join("");
+    // Aviso de transparencia: si el archivo traía conceptos marcados en rojo
+    // (bono reliquidado del mes), se excluyeron automáticamente — se lista
+    // acá para que quede claro qué se dejó fuera antes de guardar.
+    const excludedRedHtml = (entry.excludedRed && entry.excludedRed.length)
+      ? `<div class="hint" style="margin-top:6px;color:#b45309;"><i class="fas fa-circle-info"></i> Excluidos por venir marcados en rojo en el archivo (bono/reliquidación): ${esc(entry.excludedRed.join(", "))}</div>`
+      : "";
     return `<div class="file-row" data-mes="${esc(mes)}">
       <div class="fmeta" style="font-weight:600;">${esc(entry.cliente)} &middot; ${esc(entry.mesLabel)} ${entry.anio} &middot; ${entry.conceptos.length} conceptos &middot; total haberes ${fmtClp(entry.totales.haberesImponibles + entry.totales.haberesNoImponibles)}</div>
+      ${excludedRedHtml}
       ${filesListHtml}
       <button class="btn btn-go btn-sm" style="margin-top:10px" data-save-audit-mes="${esc(mes)}"><i class="fas fa-cloud-arrow-up"></i> Guardar este mes</button>
       <div class="statusmsg"></div>
