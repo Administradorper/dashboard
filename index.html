@@ -1493,6 +1493,14 @@ async function saveAuditoriaMonth(mes) {
       clienteSlug: entry.clienteSlug, cliente: entry.cliente,
       mes: entry.mes, mesLabel: entry.mesLabel, anio: entry.anio,
       conceptos: entry.conceptos, totales: entry.totales,
+      // Se guarda también qué conceptos quedaron excluidos por venir
+      // marcados en rojo en el archivo de ESTE mes puntual (ver
+      // isRedFillCell) — computeAuditAlerts lo usa para no generar una
+      // alerta falsa de "apareció"/"desapareció" cuando un concepto normal
+      // y recurrente (ej. "Seguro Cesantía Empleador") simplemente no está
+      // en los datos de este mes porque se excluyó a propósito, no porque
+      // realmente haya cambiado algo en la nómina.
+      excludedRed: entry.excludedRed || [],
       sourceFiles: items.map((e) => e.file.name),
       uploadedBy: user, uploadedAt: new Date().toISOString(),
     };
@@ -1546,10 +1554,19 @@ function computeAuditAlerts(sortedMonthDocs) {
     // excluidos de las alertas, sin necesidad de volver a subir el archivo.
     const prevByName = {}; (prev.conceptos || []).filter((c) => !isExcludedAuditConcepto(c.nombre)).forEach((c) => { prevByName[normAcc(c.nombre)] = c; });
     const currByName = {}; (curr.conceptos || []).filter((c) => !isExcludedAuditConcepto(c.nombre)).forEach((c) => { currByName[normAcc(c.nombre)] = c; });
+    // Conceptos excluidos por color (marcados en rojo en el archivo original
+    // de CADA mes puntual — ver isRedFillCell/excludedRed). Si un concepto
+    // normal y recurrente (ej. "Seguro Cesantía Empleador") vino excluido
+    // por rojo en uno de los dos meses comparados, su ausencia ahí no es un
+    // cambio real de la nómina — es la exclusión funcionando — así que no
+    // debe generar una alerta de "apareció"/"desapareció" (más abajo).
+    const prevRed = new Set((prev.excludedRed || []).map(normAcc));
+    const currRed = new Set((curr.excludedRed || []).map(normAcc));
     const allKeys = new Set([...Object.keys(prevByName), ...Object.keys(currByName)]);
     allKeys.forEach((key) => {
       const p = prevByName[key], c = currByName[key];
       const label = (c || p).nombre;
+      if ((!p || !c) && (prevRed.has(key) || currRed.has(key))) return;
       // Además del texto (desc, para las tarjetas y el prompt de la IA), cada
       // alerta trae sus valores numéricos sueltos (mesAnteriorLabel, montos,
       // cantidades, variación) — así la exportación a Excel puede armar
@@ -1590,6 +1607,10 @@ function computeAuditAlerts(sortedMonthDocs) {
   alerts.sort((a, b) => b.mes.localeCompare(a.mes));
   return alerts;
 }
+// Expuesta para que el QA pueda probar directo la supresión de
+// "apareció"/"desapareció" para conceptos excluidos por color en un mes
+// puntual, sin tener que pasar por todo el flujo de guardado en Firestore.
+window.computeAuditAlerts = computeAuditAlerts;
 
 const AUDIT_TYPE_META = {
   desaparecio: { cls: "t-desaparecio", icon: "fa-circle-minus", label: "Concepto desapareció" },
