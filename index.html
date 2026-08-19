@@ -217,6 +217,7 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:5px;backgroun
           <button type="button" class="tab-btn active" id="tabBtnDashboard"><i class="fas fa-chart-line"></i> Dashboard</button>
           <button type="button" class="tab-btn" id="tabBtnAuditoria"><i class="fas fa-magnifying-glass-chart"></i> Revisión de procesos</button>
           <button type="button" class="tab-btn" id="tabBtnDj1887"><i class="fas fa-file-invoice-dollar"></i> DJ 1887</button>
+          <button type="button" class="tab-btn" id="tabBtnBono"><i class="fas fa-gift"></i> Dashboard Bono</button>
         </div>
 
         <div id="viewDashboard">
@@ -313,6 +314,32 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:5px;backgroun
             <button class="btn btn-sec btn-sm" id="btnDescargarDj1887Excel" style="margin-top:12px;width:auto;"><i class="fas fa-file-excel"></i> Descargar DJ 1887 (Excel)</button>
 
             <div id="dj1887ResultWrap" style="margin-top:18px;"></div>
+          </div>
+        </div>
+
+        <!-- Dashboard Bono: pestaña aparte para el bono anual/reliquidado —
+             separada del Dashboard principal a pedido de Piera, para no
+             mezclar el bono con los indicadores mensuales normales del HYD
+             que se le envían al cliente. Solo tiene contenido para los
+             clientes a los que se les haya subido acá su archivo de
+             "Reliquidaciones" (bono anual/reliquidado) de BUK. -->
+        <div id="viewBono" style="display:none">
+          <div class="panel" id="bonoUploadPanel">
+            <h2>Subir bono anual de <span id="bonoClienteName">-</span></h2>
+            <div class="hint" id="bonoUploadHint">Selecciona un cliente a la izquierda primero (o crea uno nuevo escribiendo su nombre).</div>
+            <div class="upload-zone" id="bonoDropZone" style="display:none">
+              <i class="fas fa-gift"></i>
+              <div class="t1">Arrastra archivos aquí o haz clic para elegir</div>
+              <div class="t2">.xlsx — export "Reliquidaciones" de BUK (bono anual/reliquidado), puedes seleccionar varios archivos del mismo mes (ej. rol general + rol privado) a la vez</div>
+            </div>
+            <input type="file" id="bonoFileInput" accept=".xlsx" multiple style="display:none">
+            <div id="bonoFileRows"></div>
+          </div>
+
+          <div class="panel">
+            <h2>Bono anual</h2>
+            <div class="hint" id="bonoSummaryHint">Elige un cliente a la izquierda para ver su información de bono anual.</div>
+            <div id="bonoSummaryList"></div>
           </div>
         </div>
       </div>
@@ -461,6 +488,8 @@ function startApp() {
   startPolling();
   listenAuditoria();
   startPollingAuditoria();
+  listenBono();
+  startPollingBono();
   renderClientList();
   toast("Bienvenido, " + user + ".");
 }
@@ -472,6 +501,9 @@ async function loadData() {
   const auditSnap = await getDocs(collection(db, AUDIT_COLLECTION));
   auditorias = [];
   auditSnap.forEach((d) => auditorias.push(d.data()));
+  const bonoSnap = await getDocs(collection(db, BONO_COLLECTION));
+  bonos = [];
+  bonoSnap.forEach((d) => bonos.push(d.data()));
 }
 
 function listen() {
@@ -586,6 +618,7 @@ function selectClient(slug, nombre) {
   renderMonthList();
   clearDashboard();
   refreshAuditoriaClientUI();
+  refreshBonoClientUI();
 }
 
 // ============================================================================
@@ -1241,21 +1274,311 @@ async function deleteAuditoriaMonthDoc(clienteSlug, mes) {
 }
 
 // ----------------------------------------------------------------------
-// UI: pestañas (Dashboard / Revisión de procesos)
+// "Dashboard Bono" — pestaña aparte para el bono anual/reliquidado (a
+// pedido de Piera: "agregar como una pestaña aparte de dashboard bono,
+// para aquellos clientes que tuvieron bono anual"). Usa el mismo export
+// "Reliquidaciones" que ya se detectaba dentro de la subida de HYD normal
+// (ver isBono/peekPeriodBono más arriba), pero acá queda guardado aparte,
+// de forma persistente, en vez de solo existir mientras la tarjeta de
+// subida del HYD está pendiente de guardar — así Piera puede volver a
+// verlo cuando quiera sin tener que volver a subir el archivo. NUNCA se
+// mezcla con los totales del Dashboard principal (eso lo sigue
+// controlando, aparte, el casillero "incluir bono" del panel de Subir
+// HYD) — mismo patrón (listener + respaldo por polling + doc id
+// "<clienteSlug>__<mes>") que "hyd_meses" y "auditoria_meses".
+// ----------------------------------------------------------------------
+
+const BONO_COLLECTION = "bono_meses";
+let bonos = []; // all bono month docs from Firestore, across all clients
+let unsubBono = null, pollBonoT = null;
+let pendingBonoFiles = []; // [{file, error, clienteSlug, cliente, mes, mesLabel, anio, dotacion, montoBruto, impuesto, aportesEmpleador}]
+
+function listenBono() {
+  if (unsubBono) unsubBono();
+  unsubBono = onSnapshot(collection(db, BONO_COLLECTION),
+    (snap) => {
+      setSyncState(true);
+      snap.docChanges().forEach((ch) => {
+        const data = ch.doc.data();
+        if (ch.type === "removed") {
+          const sep = ch.doc.id.lastIndexOf("__");
+          const slug = sep !== -1 ? ch.doc.id.slice(0, sep) : (data && data.clienteSlug);
+          const mesVal = sep !== -1 ? ch.doc.id.slice(sep + 2) : (data && data.mes);
+          const idx = bonos.findIndex((b) => b.clienteSlug === slug && b.mes === mesVal);
+          if (idx !== -1) bonos.splice(idx, 1);
+          return;
+        }
+        if (!data) return;
+        const idx = bonos.findIndex((b) => b.clienteSlug === data.clienteSlug && b.mes === data.mes);
+        if (idx !== -1) bonos[idx] = data;
+        else bonos.push(data);
+      });
+      renderBonoSummary();
+    },
+    (err) => {
+      console.error("Error en la conexión en tiempo real (bono):", err);
+      setSyncState(false);
+    }
+  );
+}
+
+function startPollingBono() {
+  if (pollBonoT) clearInterval(pollBonoT);
+  pollBonoT = setInterval(async () => {
+    try {
+      const snap = await getDocs(collection(db, BONO_COLLECTION));
+      const fresh = [];
+      snap.forEach((d) => fresh.push(d.data()));
+      bonos = fresh;
+      renderBonoSummary();
+      setSyncState(true);
+    } catch (e) {
+      console.error("Error en la actualización periódica (bono):", e);
+    }
+  }, 15000);
+}
+
+async function saveBonoMonthDoc(rec) {
+  const id = rec.clienteSlug + "__" + rec.mes;
+  await setDoc(doc(db, BONO_COLLECTION, id), rec);
+}
+
+async function deleteBonoMonthDoc(clienteSlug, mes) {
+  const id = clienteSlug + "__" + mes;
+  await deleteDoc(doc(db, BONO_COLLECTION, id));
+  const idx = bonos.findIndex((b) => b.clienteSlug === clienteSlug && b.mes === mes);
+  if (idx !== -1) bonos.splice(idx, 1);
+}
+
+// ----------------------------------------------------------------------
+// UI: pestañas (Dashboard / Revisión de procesos / DJ 1887 / Dashboard Bono)
 // ----------------------------------------------------------------------
 
 function switchTab(tab) {
   document.getElementById("viewDashboard").style.display = tab === "dashboard" ? "" : "none";
   document.getElementById("viewAuditoria").style.display = tab === "auditoria" ? "" : "none";
   document.getElementById("viewDj1887").style.display = tab === "dj1887" ? "" : "none";
+  document.getElementById("viewBono").style.display = tab === "bono" ? "" : "none";
   document.getElementById("tabBtnDashboard").classList.toggle("active", tab === "dashboard");
   document.getElementById("tabBtnAuditoria").classList.toggle("active", tab === "auditoria");
   document.getElementById("tabBtnDj1887").classList.toggle("active", tab === "dj1887");
+  document.getElementById("tabBtnBono").classList.toggle("active", tab === "bono");
   if (tab === "auditoria") refreshAuditoriaClientUI();
+  if (tab === "bono") refreshBonoClientUI();
 }
 document.getElementById("tabBtnDashboard").addEventListener("click", () => switchTab("dashboard"));
 document.getElementById("tabBtnAuditoria").addEventListener("click", () => switchTab("auditoria"));
 document.getElementById("tabBtnDj1887").addEventListener("click", () => switchTab("dj1887"));
+document.getElementById("tabBtnBono").addEventListener("click", () => switchTab("bono"));
+
+function refreshBonoClientUI() {
+  const nameEl = document.getElementById("bonoClienteName");
+  const hintEl = document.getElementById("bonoUploadHint");
+  const zoneEl = document.getElementById("bonoDropZone");
+  if (!curClienteSlug) {
+    nameEl.textContent = "-";
+    hintEl.textContent = "Selecciona un cliente a la izquierda primero (o crea uno nuevo escribiendo su nombre).";
+    zoneEl.style.display = "none";
+  } else {
+    const nombre = curClienteNombre || curClienteSlug;
+    nameEl.textContent = nombre;
+    hintEl.textContent = `Sube uno o varios archivos "Reliquidaciones" (bono anual/reliquidado) de BUK de ${nombre} — el mismo export que a veces viene junto al HYD mensual (trae columnas "Reliquidaciones - mes", "Reliquidaciones - Monto", etc., no dotación ni rol). Si el bono trae rol general y rol privado por separado, súbelos juntos: se suman en un solo total para el mes.`;
+    zoneEl.style.display = "";
+  }
+  renderBonoSummary();
+}
+
+// ----------------------------------------------------------------------
+// UI: subida de archivos de bono anual/reliquidado
+// ----------------------------------------------------------------------
+
+const bonoDropZone = document.getElementById("bonoDropZone");
+const bonoFileInput = document.getElementById("bonoFileInput");
+bonoDropZone.addEventListener("click", () => bonoFileInput.click());
+bonoDropZone.addEventListener("dragover", (e) => { e.preventDefault(); bonoDropZone.classList.add("drag"); });
+bonoDropZone.addEventListener("dragleave", () => bonoDropZone.classList.remove("drag"));
+bonoDropZone.addEventListener("drop", (e) => {
+  e.preventDefault(); bonoDropZone.classList.remove("drag");
+  handleBonoFiles(e.dataTransfer.files);
+});
+bonoFileInput.addEventListener("change", (e) => { handleBonoFiles(e.target.files); bonoFileInput.value = ""; });
+
+async function handleBonoFiles(fileList) {
+  if (!curClienteSlug) { toast("Elige un cliente a la izquierda (o escribe uno nuevo) antes de subir el bono anual.", "warn"); return; }
+  for (const file of Array.from(fileList)) {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      let rows = [], headerRow = [];
+      wb.SheetNames.forEach((sn) => {
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: null, raw: true });
+        const sheetHeaderRow = (aoa[0] || []).map((h) => (h == null ? "" : String(h).trim()));
+        if (!sheetHeaderRow.some((h) => h)) return;
+        if (!headerRow.length) headerRow = sheetHeaderRow;
+        const sheetRows = aoa.slice(1).map((r) => {
+          const obj = {};
+          sheetHeaderRow.forEach((h, idx) => { if (!h) return; const v = r[idx]; obj[h] = v === undefined ? null : v; });
+          return obj;
+        });
+        rows = rows.concat(sheetRows);
+      });
+      // peekPeriodBono valida las columnas esenciales y detecta el mes; el
+      // cliente NO se toma del archivo acá (a diferencia de la subida de HYD
+      // normal) sino del que esté seleccionado a la izquierda — mismo criterio
+      // que la pestaña de auditoría, más simple y menos propenso a error
+      // cuando el archivo de reliquidación no trae "Empresa - Nombre Empresa".
+      const preview = peekPeriodBono(rows, headerRow);
+      const clean = rows.filter((r) => r["Reliquidaciones - mes"] != null && r["Reliquidaciones - mes"] !== "");
+      let montoBruto = 0, impuesto = 0, aportesEmpleador = 0;
+      clean.forEach((r) => {
+        montoBruto += num(r["Reliquidaciones - Monto"]);
+        impuesto += num(r["Reliquidaciones - Impuesto"]);
+        aportesEmpleador += num(r["Reliquidaciones - dif_aportes_empleador"]);
+      });
+      pendingBonoFiles.push({
+        file, error: null,
+        clienteSlug: curClienteSlug, cliente: curClienteNombre || curClienteSlug,
+        mes: preview.mes, mesLabel: preview.mesLabel, anio: preview.mes.slice(0, 4),
+        dotacion: preview.n, montoBruto, impuesto, aportesEmpleador,
+      });
+    } catch (e) {
+      pendingBonoFiles.push({ file, error: e.message });
+    }
+  }
+  renderBonoFileRows();
+}
+
+function renderBonoFileRows() {
+  const wrap = document.getElementById("bonoFileRows");
+  const errorHtml = pendingBonoFiles.filter((e) => e.error).map((entry) => `
+    <div class="file-row err">
+      <div class="fname"><i class="fas fa-file-excel"></i> ${esc(entry.file.name)}</div>
+      <div class="errmsg"><i class="fas fa-triangle-exclamation"></i> ${esc(entry.error)}</div>
+    </div>`).join("");
+
+  const groups = {}; const order = [];
+  pendingBonoFiles.forEach((entry) => {
+    if (entry.error) return;
+    if (!groups[entry.mes]) { groups[entry.mes] = []; order.push(entry.mes); }
+    groups[entry.mes].push(entry);
+  });
+  order.sort();
+
+  const groupsHtml = order.map((mes) => {
+    const items = groups[mes];
+    const first = items[0];
+    const dotacion = items.reduce((s, e) => s + e.dotacion, 0);
+    const montoBruto = items.reduce((s, e) => s + e.montoBruto, 0);
+    const filesListHtml = items.map((e) => `<div class="fname" style="font-size:11.5px;font-weight:400;"><i class="fas fa-file-excel"></i> ${esc(e.file.name)} <span style="color:var(--fg-muted)">— ${e.dotacion} colaborador(es), ${fmtClp(e.montoBruto)}</span></div>`).join("");
+    return `<div class="file-row" data-mes="${esc(mes)}">
+      <div class="fmeta" style="font-weight:600;">${esc(first.cliente)} &middot; ${esc(first.mesLabel)} ${first.anio} &middot; ${dotacion} colaborador(es) con bono &middot; ${fmtClp(montoBruto)} bruto</div>
+      ${filesListHtml}
+      <button class="btn btn-go btn-sm" style="margin-top:10px" data-save-bono-mes="${esc(mes)}"><i class="fas fa-cloud-arrow-up"></i> Guardar este mes</button>
+      <div class="statusmsg"></div>
+    </div>`;
+  }).join("");
+
+  const bulkBarHtml = order.length
+    ? `<div class="bulk-bar" id="bonoBulkBar">
+        <button class="btn btn-go btn-sm" id="btnGuardarTodoBono"><i class="fas fa-layer-group"></i> Guardar todo (${order.length} mes${order.length===1?"":"es"})</button>
+        <span class="hint" style="margin:0;">Guarda todos los meses de abajo, de ${esc(curClienteNombre || curClienteSlug)}, en un solo clic.</span>
+      </div>`
+    : "";
+
+  wrap.innerHTML = errorHtml + bulkBarHtml + groupsHtml;
+  wrap.querySelectorAll("[data-save-bono-mes]").forEach((btn) => btn.addEventListener("click", () => saveBonoMonth(btn.dataset.saveBonoMes)));
+  const btnAll = document.getElementById("btnGuardarTodoBono");
+  if (btnAll) btnAll.addEventListener("click", saveAllBonoMonths);
+}
+
+async function saveBonoMonth(mes) {
+  const row = document.querySelector(`#bonoFileRows .file-row[data-mes="${mes}"]`);
+  const statusEl = row.querySelector(".statusmsg");
+  const btn = row.querySelector("[data-save-bono-mes]");
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+  try {
+    const items = pendingBonoFiles.filter((e) => !e.error && e.mes === mes);
+    const first = items[0];
+    const rec = {
+      clienteSlug: first.clienteSlug, cliente: first.cliente,
+      mes: first.mes, mesLabel: first.mesLabel, anio: first.anio,
+      dotacion: items.reduce((s, e) => s + e.dotacion, 0),
+      montoBruto: items.reduce((s, e) => s + e.montoBruto, 0),
+      impuesto: items.reduce((s, e) => s + e.impuesto, 0),
+      aportesEmpleador: items.reduce((s, e) => s + e.aportesEmpleador, 0),
+      sourceFiles: items.map((e) => e.file.name),
+      uploadedBy: user, uploadedAt: new Date().toISOString(),
+    };
+    await saveBonoMonthDoc(rec);
+    const idx = bonos.findIndex((b) => b.clienteSlug === rec.clienteSlug && b.mes === rec.mes);
+    if (idx !== -1) bonos[idx] = rec; else bonos.push(rec);
+    statusEl.innerHTML = `<div class="okmsg"><i class="fas fa-circle-check"></i> Guardado: ${esc(rec.cliente)} — ${esc(rec.mesLabel)} ${rec.anio} (${fmtClp(rec.montoBruto)})</div>`;
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Guardar de nuevo';
+    toast(`${rec.cliente} — ${rec.mesLabel} ${rec.anio} (bono) guardado.`);
+    renderClientList();
+    renderBonoSummary();
+    return true;
+  } catch (e) {
+    console.error(e);
+    statusEl.innerHTML = `<div class="errmsg"><i class="fas fa-triangle-exclamation"></i> ${esc(e.message)}</div>`;
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Reintentar';
+    return false;
+  }
+}
+
+async function saveAllBonoMonths() {
+  const rows = Array.from(document.querySelectorAll("#bonoFileRows .file-row[data-mes]"));
+  const btnAll = document.getElementById("btnGuardarTodoBono");
+  if (btnAll) { btnAll.disabled = true; btnAll.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando todo...'; }
+  let ok = 0, fail = 0;
+  for (const row of rows) {
+    const mes = row.dataset.mes;
+    if (row.querySelector(".okmsg")) { ok++; continue; }
+    const success = await saveBonoMonth(mes);
+    if (success) ok++; else fail++;
+  }
+  if (btnAll) {
+    btnAll.disabled = false;
+    btnAll.innerHTML = fail
+      ? `<i class="fas fa-triangle-exclamation"></i> Guardado con errores (${ok} ok, ${fail} con error)`
+      : `<i class="fas fa-circle-check"></i> Todo guardado (${ok})`;
+  }
+  toast(fail ? `Guardado con ${fail} error(es) — revisa las tarjetas marcadas en rojo.` : `Se guardaron ${ok} mes(es) correctamente.`, fail ? "warn" : "success");
+}
+
+// Resumen simple (a pedido de Piera): monto bruto, colaboradores cubiertos,
+// impuesto y aportes patronales del bono, por mes, para el cliente elegido a
+// la izquierda. No se mezcla nunca con el Dashboard principal.
+function renderBonoSummary() {
+  const wrap = document.getElementById("bonoSummaryList");
+  const hintEl = document.getElementById("bonoSummaryHint");
+  if (!wrap || !hintEl) return;
+  if (!curClienteSlug) {
+    hintEl.textContent = "Elige un cliente a la izquierda para ver su información de bono anual.";
+    wrap.innerHTML = "";
+    return;
+  }
+  const nombre = curClienteNombre || curClienteSlug;
+  const clienteBonos = bonos.filter((b) => b.clienteSlug === curClienteSlug).sort((a, b) => a.mes.localeCompare(b.mes));
+  if (!clienteBonos.length) {
+    hintEl.textContent = `${nombre} no tiene bono anual/reliquidado cargado.`;
+    wrap.innerHTML = `<div class="empty-state"><i class="fas fa-gift"></i>No hay información de bono anual para ${esc(nombre)} todavía. Súbela arriba si este cliente tuvo bono anual/reliquidado.</div>`;
+    return;
+  }
+  hintEl.textContent = `${nombre} — ${clienteBonos.length} mes(es) con bono anual/reliquidado registrado.`;
+  wrap.innerHTML = clienteBonos.map((b) => `
+    <div class="file-row">
+      <div class="fmeta" style="font-weight:600;">${esc(b.cliente)} &middot; ${esc(b.mesLabel)} ${b.anio}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:4px;">
+        <div><div class="hint" style="margin:0;">Monto bruto</div><div style="font-weight:700;font-size:15px;">${fmtClp(b.montoBruto)}</div></div>
+        <div><div class="hint" style="margin:0;">Colaboradores</div><div style="font-weight:700;font-size:15px;">${b.dotacion}</div></div>
+        <div><div class="hint" style="margin:0;">Impuesto</div><div style="font-weight:700;font-size:15px;">${fmtClp(b.impuesto)}</div></div>
+        <div><div class="hint" style="margin:0;">Aportes patronales</div><div style="font-weight:700;font-size:15px;">${fmtClp(b.aportesEmpleador)}</div></div>
+      </div>
+      <div class="hint" style="margin-top:10px;">Archivo(s): ${esc((b.sourceFiles || []).join(", "))}</div>
+    </div>
+  `).join("");
+}
 
 function refreshAuditoriaClientUI() {
   const nameEl = document.getElementById("auditoriaClienteName");
