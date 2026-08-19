@@ -340,6 +340,13 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:5px;backgroun
             <h2>Bono anual</h2>
             <div class="hint" id="bonoSummaryHint">Elige un cliente a la izquierda para ver su información de bono anual.</div>
             <div id="bonoSummaryList"></div>
+            <div class="dash-toolbar" style="margin-top:14px;">
+              <button class="btn btn-go btn-sm" id="btnGenerarBono" disabled><i class="fas fa-chart-line"></i> Generar dashboard bono</button>
+              <button class="btn btn-sec btn-sm" id="btnDescargarPdfBono" disabled><i class="fas fa-file-pdf"></i> Descargar PDF</button>
+            </div>
+            <div class="dashboard-preview" id="bonoDashPreviewWrap">
+              <div class="empty-state"><i class="fas fa-chart-simple"></i>Elige un cliente con bono anual cargado y presiona "Generar dashboard bono".</div>
+            </div>
           </div>
         </div>
       </div>
@@ -619,6 +626,7 @@ function selectClient(slug, nombre) {
   clearDashboard();
   refreshAuditoriaClientUI();
   refreshBonoClientUI();
+  clearBonoDashboard();
 }
 
 // ============================================================================
@@ -1552,14 +1560,17 @@ async function saveAllBonoMonths() {
 function renderBonoSummary() {
   const wrap = document.getElementById("bonoSummaryList");
   const hintEl = document.getElementById("bonoSummaryHint");
+  const btnGen = document.getElementById("btnGenerarBono");
   if (!wrap || !hintEl) return;
   if (!curClienteSlug) {
     hintEl.textContent = "Elige un cliente a la izquierda para ver su información de bono anual.";
     wrap.innerHTML = "";
+    if (btnGen) btnGen.disabled = true;
     return;
   }
   const nombre = curClienteNombre || curClienteSlug;
   const clienteBonos = bonos.filter((b) => b.clienteSlug === curClienteSlug).sort((a, b) => a.mes.localeCompare(b.mes));
+  if (btnGen) btnGen.disabled = !clienteBonos.length;
   if (!clienteBonos.length) {
     hintEl.textContent = `${nombre} no tiene bono anual/reliquidado cargado.`;
     wrap.innerHTML = `<div class="empty-state"><i class="fas fa-gift"></i>No hay información de bono anual para ${esc(nombre)} todavía. Súbela arriba si este cliente tuvo bono anual/reliquidado.</div>`;
@@ -1579,6 +1590,139 @@ function renderBonoSummary() {
     </div>
   `).join("");
 }
+
+function clearBonoDashboard() {
+  const wrap = document.getElementById("bonoDashPreviewWrap");
+  if (wrap) wrap.innerHTML = '<div class="empty-state"><i class="fas fa-chart-simple"></i>Elige un cliente con bono anual cargado y presiona "Generar dashboard bono".</div>';
+  const btnPdf = document.getElementById("btnDescargarPdfBono");
+  if (btnPdf) btnPdf.disabled = true;
+  window._lastBonoDashboardHTML = null;
+}
+
+// PDF de una página con el estilo de ECR (mismos colores/tipografía que el
+// Dashboard principal, ver renderDashboardHTML) — a pedido de Piera
+// ("pero no genera un dashboard en pdf?"), para que el bono anual también se
+// pueda descargar/enviar como documento, no solo verse en pantalla. Resume
+// TODOS los meses de bono guardados del cliente en una sola página (monto
+// bruto, colaboradores, impuesto y aportes patronales acumulados, más el
+// detalle mes a mes en una tabla) — nunca incluye ni suma nada del Dashboard
+// principal, son datos completamente aparte.
+function renderBonoDashboardHTML(clienteBonos, cliente, logoSvg) {
+  const sorted = clienteBonos.slice().sort((a, b) => a.mes.localeCompare(b.mes));
+  const first = sorted[0], last = sorted[sorted.length - 1];
+  const periodoLabel = sorted.length === 1
+    ? `${first.mesLabel} ${first.anio}`
+    : (first.anio === last.anio ? `${first.mesLabel}–${last.mesLabel} ${last.anio}` : `${first.mesLabel} ${first.anio}–${last.mesLabel} ${last.anio}`);
+  const totalMonto = sorted.reduce((s, b) => s + (b.montoBruto || 0), 0);
+  const totalDotacion = sorted.reduce((s, b) => s + (b.dotacion || 0), 0);
+  const totalImpuesto = sorted.reduce((s, b) => s + (b.impuesto || 0), 0);
+  const totalAportes = sorted.reduce((s, b) => s + (b.aportesEmpleador || 0), 0);
+  const logoTag = `<span class="ecr-logo">${logoSvg}</span>`;
+  const filasHtml = sorted.map((b) => `
+    <tr>
+      <td style="padding:7px 4px; border-bottom:1px solid #ecebe6;">${esc2(b.mesLabel)} ${esc2(b.anio)}</td>
+      <td style="padding:7px 4px; border-bottom:1px solid #ecebe6; text-align:right;">${fmtClp(b.montoBruto)}</td>
+      <td style="padding:7px 4px; border-bottom:1px solid #ecebe6; text-align:right;">${fmt(b.dotacion)}</td>
+      <td style="padding:7px 4px; border-bottom:1px solid #ecebe6; text-align:right;">${fmtClp(b.impuesto)}</td>
+      <td style="padding:7px 4px; border-bottom:1px solid #ecebe6; text-align:right;">${fmtClp(b.aportesEmpleador)}</td>
+      <td style="padding:7px 4px; border-bottom:1px solid #ecebe6; font-size:10px; color:#898781;">${esc2((b.sourceFiles || []).join(", "))}</td>
+    </tr>`).join("");
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Bono anual — ${esc2(cliente)} — ${periodoLabel}</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1B2A4A; background: #f9f9f7; -webkit-font-smoothing: antialiased; }
+  .page { width: 210mm; min-height: 297mm; background: #fcfcfb; position: relative; padding: 15mm 14mm 12mm 14mm; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #1B2A4A; padding-bottom:10px; margin-bottom:16px; }
+  .header .brand { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#898781; font-weight:600; }
+  .header h1 { font-size:21px; margin:2px 0 0 0; font-weight:700; color:#1B2A4A; }
+  .header .sub { font-size:11.5px; color:#52514e; margin-top:3px; }
+  .header .meta { text-align:right; font-size:11px; color:#52514e; line-height:1.5; }
+  .header .meta b { color:#1B2A4A; }
+  .header .meta-block { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+  .ecr-logo { height:30px; width:auto; display:block; }
+  .ecr-logo svg { height:100%; width:auto; display:block; }
+  .kpi-row { display:flex; gap:8px; margin-bottom:13px; }
+  .kpi { flex:1; background:#fcfcfb; border:1px solid #e1e0d9; border-radius:8px; padding:10px 11px; min-width:0; }
+  .kpi .label { font-size:9.5px; color:#898781; text-transform:uppercase; letter-spacing:0.2px; font-weight:600; margin-bottom:5px; overflow-wrap:break-word; word-break:break-word; }
+  .kpi .value { font-size:19px; font-weight:700; color:#1B2A4A; line-height:1; }
+  .kpi .foot { font-size:9.5px; color:#898781; margin-top:5px; }
+  .section { margin-bottom:11px; }
+  .section-title { font-size:13px; font-weight:700; margin:0 0 2px 0; }
+  .section-sub { font-size:10px; color:#898781; margin:0 0 8px 0; }
+  .card { border:1px solid #e1e0d9; border-radius:8px; padding:12px 14px 8px 14px; background:#fcfcfb; }
+  .footer { position:relative; margin-top:24px; font-size:8.8px; color:#898781; border-top:1px solid #e1e0d9; padding-top:6px; display:flex; justify-content:space-between; gap:16px; }
+  .footer span:first-child { white-space:nowrap; flex-shrink:0; }
+  .footer span:last-child { text-align:right; flex-shrink:1; }
+  .pagenum { font-size:8.8px; color:#898781; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div><div class="brand">Capital Humano</div><h1>${esc2(cliente)}</h1><div class="sub">Bono anual / reliquidado &middot; ${periodoLabel}</div></div>
+    <div class="meta-block">${logoTag}<div class="meta"><div>Período reportado: <b>${periodoLabel}</b></div></div></div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="label">Monto bruto</div><div class="value">${fmtClp(totalMonto)}</div><div class="foot">acumulado ${periodoLabel}</div></div>
+    <div class="kpi"><div class="label">Colaboradores</div><div class="value">${fmt(totalDotacion)}</div><div class="foot">acumulado ${periodoLabel}</div></div>
+    <div class="kpi"><div class="label">Impuesto</div><div class="value">${fmtClp(totalImpuesto)}</div><div class="foot">acumulado ${periodoLabel}</div></div>
+    <div class="kpi"><div class="label">Aportes patronales</div><div class="value">${fmtClp(totalAportes)}</div><div class="foot">acumulado ${periodoLabel}</div></div>
+  </div>
+  <div class="section">
+    <div class="section-title">Detalle por mes</div>
+    <div class="section-sub">Bono anual/reliquidado (export "Reliquidaciones" de BUK), aparte del HYD mensual normal. Este monto NO está incluido en los totales del Dashboard principal, salvo que se haya marcado expresamente el casillero "incluir bono" al guardar ese mes ahí.</div>
+    <div class="card">
+      <table style="width:100%; border-collapse:collapse; font-size:11px;">
+        <thead><tr>
+          <th style="text-align:left; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Mes</th>
+          <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Monto bruto</th>
+          <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Colaboradores</th>
+          <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Impuesto</th>
+          <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Aportes patronales</th>
+          <th style="text-align:left; padding:6px 4px; border-bottom:1px solid #e1e0d9; color:#898781; font-weight:600; font-size:10px; text-transform:uppercase;">Archivo(s)</th>
+        </tr></thead>
+        <tbody>${filasHtml}</tbody>
+      </table>
+    </div>
+  </div>
+  <div class="footer"><span>Capital Humano &mdash; Cliente ${esc2(cliente)}</span><span>Información agregada y anonimizada.</span></div>
+  <div class="pagenum" style="position:absolute; bottom:5mm; right:14mm;">1 / 1</div>
+</div>
+</body>
+</html>`;
+}
+
+document.getElementById("btnGenerarBono").addEventListener("click", () => {
+  const clienteBonos = bonos.filter((b) => b.clienteSlug === curClienteSlug);
+  if (!clienteBonos.length) { toast("Este cliente no tiene bono anual cargado.", "warn"); return; }
+  try {
+    const html = renderBonoDashboardHTML(clienteBonos, curClienteNombre || curClienteSlug, ECR_LOGO_SVG);
+    window._lastBonoDashboardHTML = html;
+    const wrap = document.getElementById("bonoDashPreviewWrap");
+    wrap.innerHTML = '<iframe id="bonoDashFrame"></iframe>';
+    document.getElementById("bonoDashFrame").srcdoc = html;
+    document.getElementById("btnDescargarPdfBono").disabled = false;
+    toast("Dashboard de bono anual generado.");
+  } catch (e) {
+    console.error(e);
+    toast("No se pudo generar el dashboard de bono: " + e.message, "warn");
+  }
+});
+
+document.getElementById("btnDescargarPdfBono").addEventListener("click", () => {
+  if (!window._lastBonoDashboardHTML) return;
+  const w = window.open("", "_blank");
+  if (!w) { toast("El navegador bloqueó la ventana de impresión. Habilita las ventanas emergentes para este sitio.", "warn"); return; }
+  w.document.write(window._lastBonoDashboardHTML);
+  w.document.close();
+  w.onload = () => setTimeout(() => w.print(), 300);
+});
 
 function refreshAuditoriaClientUI() {
   const nameEl = document.getElementById("auditoriaClienteName");
