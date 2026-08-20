@@ -1837,15 +1837,29 @@ function parseAuditoriaAOA(aoa, sheet) {
   if (missing.length) throw new Error("Faltan columnas esenciales en el resumen de auditoría: " + missing.join(", "));
   const hasSobregiro = "sobregiro" in colIdx;
   const g = (row, key) => { const idx = colIdx[key]; return idx == null ? null : row[idx]; };
+  // Campos de monto de cada fila — cada uno se lee de su propia celda para
+  // poder detectar si ESA celda puntual viene en rojo, en vez de solo mirar
+  // el color de la celda del Ítem (ver más abajo).
+  const MONTO_FIELDS = [
+    { key: "haberesImponibles", col: "haberes imponibles" },
+    { key: "haberesNoImponibles", col: "haberes no imponibles" },
+    { key: "leyesSociales", col: "leyes sociales" },
+    { key: "descuentos", col: "descuentos" },
+    { key: "aportesEmpresa", col: "aportes empresa" },
+  ];
   const conceptos = [];
   const excludedRed = [];
-  let totales = null;
+  const excludedRedCeldas = [];
+  let totalRow = null;
   for (let i = headerIdx + 1; i < aoa.length; i++) {
     const row = aoa[i] || [];
     const nombre = g(row, "item");
     if (nombre == null || String(nombre).trim() === "") continue;
     const nombreNorm = normAcc(nombre);
     if (isExcludedAuditConcepto(nombre)) continue;
+    // Si la fila entera viene marcada en rojo (el Ítem mismo), se excluye
+    // completa — es el caso de Vivo Spa abril-2026, donde BUK resaltó toda la
+    // fila del concepto retroactivo.
     if (nombreNorm !== "total" && isRedFillCell(sheet, i, colIdx["item"])) { excludedRed.push(String(nombre).trim()); continue; }
     const rec = {
       nombre: String(nombre).trim(),
@@ -1858,14 +1872,53 @@ function parseAuditoriaAOA(aoa, sheet) {
       sobregiro: hasSobregiro ? num(g(row, "sobregiro")) : 0,
       sueldoLiquido: num(g(row, "sueldo liquido")),
     };
+    // Además de la fila completa, a veces BUK/Piera resaltan en rojo solo UNA
+    // celda de monto dentro de una fila que por lo demás es normal — ej.
+    // BBR marzo-2026: la fila "Bono" trae Haberes Imponibles normal ($15,7M,
+    // el bono MENSUAL del mes, que sí corresponde) pero Haberes No Imponibles
+    // en rojo (la porción del bono ANUAL reliquidado ese mes, que se maneja
+    // aparte y no debe sumarse al proceso normal). Si solo se mirara el color
+    // del Ítem, esta fila no se detectaría como parcialmente excluida y todo
+    // el monto de "Bono" — mensual y anual mezclados — quedaría en el total,
+    // sin cuadrar con lo que realmente corresponde al proceso de ese mes.
+    if (nombreNorm !== "total") {
+      MONTO_FIELDS.forEach(({ key, col }) => {
+        if (rec[key] && isRedFillCell(sheet, i, colIdx[col])) {
+          excludedRedCeldas.push(`${rec.nombre} (${col})`);
+          rec[key] = 0;
+        }
+      });
+    }
     if (nombreNorm === "total") {
-      totales = rec;
+      totalRow = rec;
       break; // no hay nada útil después de la fila Total
     }
     conceptos.push(rec);
   }
-  if (!totales) throw new Error('No se encontró la fila "Total" en este archivo.');
-  return { conceptos, totales, excludedRed };
+  if (!totalRow) throw new Error('No se encontró la fila "Total" en este archivo.');
+  // El Total se RECALCULA sumando los conceptos ya ajustados (en vez de usar
+  // directo la fila "Total" del archivo) para que, cuando hubo alguna celda
+  // excluida por rojo, el total quede consistente con lo que de verdad se
+  // está contando — si no, la fila "Total" de BUK seguiría trayendo el monto
+  // original con el rojo incluido y el resumen no cuadraría con el proceso.
+  // "Cantidad de Asignaciones" NO se toca (Piera pidió excluir los MONTOS en
+  // rojo, no las asignaciones) — se deja la del archivo, que ya es la suma de
+  // las de cada concepto. "Sueldo Líquido" se recalcula con la misma fórmula
+  // que usa BUK (Haberes Imponibles + No Imponibles − Leyes Sociales −
+  // Descuentos), verificada contra el propio archivo antes de este cambio.
+  const sumField = (key) => conceptos.reduce((s, c) => s + (c[key] || 0), 0);
+  const totales = {
+    nombre: "Total",
+    cantidadAsignaciones: totalRow.cantidadAsignaciones,
+    haberesImponibles: sumField("haberesImponibles"),
+    haberesNoImponibles: sumField("haberesNoImponibles"),
+    leyesSociales: sumField("leyesSociales"),
+    descuentos: sumField("descuentos"),
+    aportesEmpresa: sumField("aportesEmpresa"),
+    sobregiro: sumField("sobregiro"),
+  };
+  totales.sueldoLiquido = (totales.haberesImponibles + totales.haberesNoImponibles) - (totales.leyesSociales + totales.descuentos);
+  return { conceptos, totales, excludedRed, excludedRedCeldas };
 }
 // Expuesta para que el QA (que corre en el contexto global de la página)
 // pueda probar directamente la exclusión por color de celda sin tener que
@@ -1896,6 +1949,7 @@ async function handleAuditoriaFiles(fileList) {
         clienteSlug: curClienteSlug, cliente: curClienteNombre || curClienteSlug,
         mes: periodo.mes, mesLabel: periodo.mesLabel, anio: periodo.anio,
         conceptos: parsed.conceptos, totales: parsed.totales, excludedRed: parsed.excludedRed,
+        excludedRedCeldas: parsed.excludedRedCeldas,
       });
     } catch (e) {
       pendingAuditFiles.push({ file, error: e.message });
@@ -1930,9 +1984,16 @@ function renderAuditoriaFileRows() {
     const excludedRedHtml = (entry.excludedRed && entry.excludedRed.length)
       ? `<div class="hint" style="margin-top:6px;color:#b45309;"><i class="fas fa-circle-info"></i> Excluidos por venir marcados en rojo en el archivo (bono/reliquidación): ${esc(entry.excludedRed.join(", "))}</div>`
       : "";
+    // Igual que arriba, pero para celdas de monto puntuales dentro de una
+    // fila que por lo demás se mantiene (ver nota en parseAuditoriaAOA) — ej.
+    // "Bono (haberes no imponibles)" cuando solo esa columna vino en rojo.
+    const excludedRedCeldasHtml = (entry.excludedRedCeldas && entry.excludedRedCeldas.length)
+      ? `<div class="hint" style="margin-top:6px;color:#b45309;"><i class="fas fa-circle-info"></i> Montos puntuales excluidos por venir en rojo (el resto de esa fila sí se mantiene): ${esc(entry.excludedRedCeldas.join(", "))}</div>`
+      : "";
     return `<div class="file-row" data-mes="${esc(mes)}">
       <div class="fmeta" style="font-weight:600;">${esc(entry.cliente)} &middot; ${esc(entry.mesLabel)} ${entry.anio} &middot; ${entry.conceptos.length} conceptos &middot; total haberes ${fmtClp(entry.totales.haberesImponibles + entry.totales.haberesNoImponibles)}</div>
       ${excludedRedHtml}
+      ${excludedRedCeldasHtml}
       ${filesListHtml}
       <button class="btn btn-go btn-sm" style="margin-top:10px" data-save-audit-mes="${esc(mes)}"><i class="fas fa-cloud-arrow-up"></i> Guardar este mes</button>
       <div class="statusmsg"></div>
@@ -1972,6 +2033,7 @@ async function saveAuditoriaMonth(mes) {
       // en los datos de este mes porque se excluyó a propósito, no porque
       // realmente haya cambiado algo en la nómina.
       excludedRed: entry.excludedRed || [],
+      excludedRedCeldas: entry.excludedRedCeldas || [],
       sourceFiles: items.map((e) => e.file.name),
       uploadedBy: user, uploadedAt: new Date().toISOString(),
     };
