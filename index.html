@@ -988,6 +988,10 @@ async function saveMonthGroup(groupKey) {
     const agg = computeMonthAggregate(combinedRows, imm, tramoUmbral, {
       sourceFiles: rosterEntries.map((e) => e.file.name).concat(bonoEntries.map((e) => e.file.name)),
       uploadedBy: user, uploadedAt: new Date().toISOString(),
+      // Cliente ya detectado al momento de SUBIR el archivo (ver peekPeriod),
+      // usado como respaldo si el archivo no trae "Empresa - Nombre Empresa"
+      // en vez de curClienteNombre (ver nota en computeMonthAggregate).
+      cliente: rosterEntries[0].cliente,
     }, combinedHeaderRow);
 
     if (bonoEntries.length) {
@@ -2692,13 +2696,21 @@ function computeMonthAggregate(rawRows, imm, tramoUmbral, meta, headerRow) {
   if (!rows.length) throw new Error("No se encontró ningún período válido en el archivo.");
   const empresas = Array.from(new Set(rows.map((r) => r["Empresa - Nombre Empresa"]).filter(Boolean)));
   // Clientes como Filopulli combinan varias razones sociales en un mismo
-  // archivo/mes: si el archivo trae más de una empresa distinta, el nombre
-  // del "cliente" para la tarjeta/slug debe ser el que Piera seleccionó a
-  // la izquierda (curClienteNombre) — no una razón social cualquiera tomada
-  // al azar (antes se usaba siempre empresas[0], lo que podía hacer que el
-  // mismo cliente quedara guardado bajo un slug distinto cada mes según qué
-  // razón social apareciera primero en el archivo).
-  const company = (empresas.length === 1 ? empresas[0] : null) || curClienteNombre || empresas[0] || "Cliente";
+  // archivo/mes: si el archivo trae más de una empresa distinta (o ninguna,
+  // ej. Tres Valles), el nombre del "cliente" para la tarjeta/slug debe ser
+  // el que ya se detectó al SUBIR el archivo (meta.cliente, ver peekPeriod)
+  // — no una razón social cualquiera tomada al azar (antes se usaba siempre
+  // empresas[0], lo que podía hacer que el mismo cliente quedara guardado
+  // bajo un slug distinto cada mes según qué razón social apareciera primero
+  // en el archivo). Usar meta.cliente en vez de curClienteNombre es clave
+  // para "Guardar todo": ese botón guarda VARIOS clientes en fila y
+  // curClienteNombre refleja el último cliente seleccionado en la barra
+  // lateral al momento de guardar (no necesariamente el de esta fila) — con
+  // curClienteNombre, un archivo sin "Empresa - Nombre Empresa" (ej.
+  // Transelec) podía terminar guardado bajo el slug de OTRO cliente que
+  // estuviera seleccionado en ese instante, mezclando o pisando datos.
+  // curClienteNombre queda solo como último respaldo por compatibilidad.
+  const company = (empresas.length === 1 ? empresas[0] : null) || meta.cliente || curClienteNombre || empresas[0] || "Cliente";
   const periodos = rows.map((r) => toDate(r["Liquidación - Período"])).filter(Boolean);
   const mesKeys = Array.from(new Set(periodos.map(ymKey)));
   if (mesKeys.length > 1) throw new Error("Este archivo trae más de un período distinto (" + mesKeys.join(", ") + "). Sube un archivo por mes.");
