@@ -787,7 +787,7 @@ function peekPeriod(rows, headerRow) {
     e.detected = detected;
     throw e;
   }
-  const clean = rows.filter((r) => r["Liquidación - Período"] != null && r["Liquidación - Período"] !== "");
+  const clean = rows.filter((r) => r["Liquidación - Período"] != null && r["Liquidación - Período"] !== "" && isRealEmployeeRow(r, headerRow));
   if (!clean.length) throw new Error("No se encontró ningún período válido en este archivo.");
   const empresas = Array.from(new Set(clean.map((r) => r["Empresa - Nombre Empresa"]).filter(Boolean)));
   const periodos = clean.map((r) => toDate(r["Liquidación - Período"])).filter(Boolean);
